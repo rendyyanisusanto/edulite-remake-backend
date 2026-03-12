@@ -1,4 +1,4 @@
-const { Student, ParentProfile, StudentDocument } = require('../../models');
+const { Student, ParentProfile, StudentDocument, StudentClassHistory, Class } = require('../../models');
 const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
 
@@ -8,6 +8,7 @@ class StudentService {
         const limit = parseInt(query.limit) || 10;
         const offset = (page - 1) * limit;
         const search = query.search || '';
+        const classId = query.class_id;
 
         const whereCondition = {};
         if (search) {
@@ -18,11 +19,25 @@ class StudentService {
             ];
         }
 
+        const include = [
+            {
+                model: StudentClassHistory,
+                as: 'class_history',
+                required: classId ? true : false,
+                where: classId ? { class_id: classId } : undefined,
+                include: [
+                    { model: Class, as: 'class_info', attributes: ['id', 'name'] }
+                ]
+            }
+        ];
+
         const students = await Student.findAndCountAll({
             where: whereCondition,
+            include,
             limit,
             offset,
-            order: [['created_at', 'DESC']]
+            order: [['created_at', 'DESC']],
+            distinct: true
         });
 
         return {
