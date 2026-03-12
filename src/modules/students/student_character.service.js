@@ -1,5 +1,6 @@
 const { Student, Class, AcademicYear, AchievementResult, AchievementParticipant, Achievement, AchievementPointRule, StudentViolation, ViolationType, ViolationLevel } = require('../../models');
 const PDFDocument = require('pdfkit');
+const path = require('path');
 
 class StudentCharacterService {
 
@@ -143,9 +144,8 @@ class StudentCharacterService {
                     doc.fillColor('#374151');
                 };
 
-                // --- HEADER IMAGE ---
                 try {
-                    doc.image('/home/rendy/Documents/projects/edulite-remake/header.png', 50, 0, { width: 495 });
+                    doc.image(path.join(process.cwd(), 'public/header.png'), 50, 0, { width: 495 });
                     doc.y = 90; // Setup general start below the image
                 } catch (e) {
                     console.error("Header image not found, skipping.");
