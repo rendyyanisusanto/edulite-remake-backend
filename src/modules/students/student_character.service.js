@@ -81,7 +81,8 @@ class StudentCharacterService {
                 type: v.type ? v.type.name : '-',
                 level: v.type && v.type.level ? v.type.level.name : '-',
                 points: v.type ? parseInt(v.type.point || 0) : 0,
-                location: v.location
+                location: v.location,
+                description: v.description
             };
         });
 
@@ -265,19 +266,24 @@ class StudentCharacterService {
                     drawTableHeader(thY2, 16);
                     doc.font('Helvetica-Bold').fontSize(9).fillColor('#1f2937');
                     doc.text('Tanggal', 55, thY2 + 4);
-                    doc.text('Jenis Pelanggaran', 125, thY2 + 4);
-                    doc.text('Level', 385, thY2 + 4);
+                    doc.text('Jenis / Kronologi', 125, thY2 + 4);
+                    doc.text('Level', 415, thY2 + 4);
                     doc.text('Poin', 505, thY2 + 4);
                     doc.y = thY2 + 20;
 
                     doc.font('Helvetica').fontSize(9).fillColor('#1f2937');
                     reportData.violations.forEach((v, index) => {
-                        if (doc.y > 760) { doc.addPage(); doc.y = 50; }
+                        const content = v.description ? `${v.type} / ${v.description}` : v.type;
+                        const contentHeight = doc.heightOfString(content, { width: 280 });
+                        
+                        if (doc.y + contentHeight > 760) { doc.addPage(); doc.y = 50; }
                         const y = doc.y;
                         doc.text(v.date ? new Date(v.date).toLocaleDateString('id-ID') : '-', 55, y, { width: 65 });
-                        doc.text(v.type || '-', 125, y, { width: 250 });
-                        doc.text(v.level || '-', 385, y, { width: 115 });
+                        doc.text(content, 125, y, { width: 280, align: 'justify' });
+                        doc.text(v.level || '-', 415, y, { width: 85 });
                         doc.text(`-${v.points}`, 505, y, { width: 40 });
+                        
+                        doc.y = y + Math.max(contentHeight, 12);
                         doc.moveDown(0.3);
                         drawLine(doc.y);
                         doc.moveDown(0.3);
