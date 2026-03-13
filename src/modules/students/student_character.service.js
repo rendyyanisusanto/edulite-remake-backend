@@ -1,4 +1,4 @@
-const { Student, Class, AcademicYear, AchievementResult, AchievementParticipant, Achievement, AchievementPointRule, StudentViolation, ViolationType, ViolationLevel } = require('../../models');
+const { Student, Class, AcademicYear, AchievementResult, AchievementParticipant, Achievement, AchievementPointRule, StudentViolation, ViolationType, ViolationLevel, StudentPositivePoint, PositivePointType } = require('../../models');
 const PDFDocument = require('pdfkit');
 const path = require('path');
 
@@ -61,9 +61,35 @@ class StudentCharacterService {
 
         const totalAchievementPoints = achievements.reduce((sum, item) => sum + item.points, 0);
 
+        // Fetch Positive Notes
+        const positivePointsData = await StudentPositivePoint.findAll({
+            where: { student_id: studentId, status: 'APPROVED' },
+            include: [
+                {
+                    model: PositivePointType,
+                    as: 'type'
+                }
+            ],
+            order: [['date', 'DESC']]
+        });
+
+        const positiveNotes = positivePointsData.map(p => {
+            return {
+                id: p.id,
+                date: p.date,
+                type: p.type ? p.type.name : '-',
+                category: p.type ? p.type.category : '-',
+                points: parseInt(p.points || 0),
+                location: p.location,
+                description: p.description
+            };
+        });
+
+        const totalPositivePoints = positiveNotes.reduce((sum, item) => sum + item.points, 0);
+
         // Fetch Violations (Only approved)
         const violationsData = await StudentViolation.findAll({
-            where: { student_id: studentId, status: 'approved' },
+            where: { student_id: studentId, status: 'APPROVED' },
             include: [
                 {
                     model: ViolationType,
@@ -91,9 +117,11 @@ class StudentCharacterService {
         const summary = {
             total_achievements: achievements.length,
             total_achievement_points: totalAchievementPoints,
+            total_positive_notes: positiveNotes.length,
+            total_positive_points: totalPositivePoints,
             total_violations: violations.length,
             total_violation_points: totalViolationPoints,
-            final_score: totalAchievementPoints - totalViolationPoints
+            final_score: totalAchievementPoints + totalPositivePoints - totalViolationPoints
         };
 
         const { AcademicYear } = require('../../models');
@@ -111,6 +139,7 @@ class StudentCharacterService {
             },
             summary,
             achievements,
+            positiveNotes,
             violations
         };
     }
@@ -212,13 +241,57 @@ class StudentCharacterService {
                 doc.text('Total Poin Prestasi', 295, contentY);
                 doc.font('Helvetica-Bold').fillColor('#16a34a').text(`: +${reportData.summary.total_achievement_points}`, 430, contentY);
 
-                doc.font('Helvetica').fillColor('#1f2937').text('Total Poin Pelanggaran', 295, contentY + 15);
-                doc.font('Helvetica-Bold').fillColor('#dc2626').text(`: -${reportData.summary.total_violation_points}`, 430, contentY + 15);
+                // Add Total Catatan Positif here
+                doc.font('Helvetica').fillColor('#1f2937').text('Total Poin Catatan Positif', 295, contentY + 15);
+                doc.font('Helvetica-Bold').fillColor('#0d9488').text(`: +${reportData.summary.total_positive_points}`, 430, contentY + 15);
 
-                doc.font('Helvetica').fillColor('#1f2937').text('Nilai Karakter Akhir', 295, contentY + 30);
-                doc.font('Helvetica-Bold').fontSize(10).fillColor('#1d4ed8').text(`: ${reportData.summary.final_score}`, 430, contentY + 30);
+                doc.font('Helvetica').fillColor('#1f2937').text('Total Poin Pelanggaran', 295, contentY + 30);
+                doc.font('Helvetica-Bold').fillColor('#dc2626').text(`: -${reportData.summary.total_violation_points}`, 430, contentY + 30);
+
+                doc.font('Helvetica').fillColor('#1f2937').text('Nilai Karakter Akhir', 295, contentY + 45);
+                doc.font('Helvetica-Bold').fontSize(10).fillColor('#1d4ed8').text(`: ${reportData.summary.final_score}`, 430, contentY + 45);
 
                 doc.y = contentY + 65;
+
+                // --- CATATAN POSITIF ---
+                drawSectionTitle('CATATAN POSITIF');
+                doc.moveDown(0.5);
+
+                if (reportData.positiveNotes.length === 0) {
+                    doc.font('Helvetica-Oblique').fontSize(10).fillColor('#1f2937').text('Belum ada catatan positif tercatat.');
+                    doc.moveDown(1);
+                } else {
+                    const thY = doc.y;
+                    drawTableHeader(thY, 16);
+                    doc.font('Helvetica-Bold').fontSize(9).fillColor('#1f2937');
+                    doc.text('Tanggal', 55, thY + 4);
+                    doc.text('Nama Catatan / Kategori', 125, thY + 4);
+                    doc.text('Keterangan', 285, thY + 4);
+                    doc.text('Poin', 505, thY + 4);
+                    doc.y = thY + 20;
+
+                    doc.font('Helvetica').fontSize(9).fillColor('#1f2937');
+                    reportData.positiveNotes.forEach((pNote, index) => {
+                        const content = pNote.description ? `${pNote.category || '-'} / ${pNote.description}` : (pNote.category || '-');
+                        const contentHeight = Math.max(
+                            doc.heightOfString(pNote.type || '-', { width: 150 }),
+                            doc.heightOfString(content, { width: 210 })
+                        );
+                        
+                        if (doc.y + contentHeight > 760) { doc.addPage(); doc.y = 50; }
+                        const y = doc.y;
+                        doc.text(pNote.date ? new Date(pNote.date).toLocaleDateString('id-ID') : '-', 55, y, { width: 65 });
+                        doc.text(pNote.type || '-', 125, y, { width: 150 });
+                        doc.text(content, 285, y, { width: 210 });
+                        doc.text(`+${pNote.points}`, 505, y, { width: 40 });
+                        
+                        doc.y = y + Math.max(contentHeight, 12);
+                        doc.moveDown(0.3);
+                        drawLine(doc.y);
+                        doc.moveDown(0.3);
+                    });
+                    doc.moveDown(1);
+                }
 
                 // --- DATA PRESTASI ---
                 drawSectionTitle('RIWAYAT PRESTASI');
@@ -228,7 +301,10 @@ class StudentCharacterService {
                     doc.font('Helvetica-Oblique').fontSize(10).fillColor('#1f2937').text('Belum ada data prestasi tercatat.');
                     doc.moveDown(1);
                 } else {
-                    const thY = doc.y;
+                    let thY = doc.y;
+                    if (thY > 740) { doc.addPage(); doc.y = 50; }
+                    thY = doc.y; // Ensure thY is correct after potential page break
+                    
                     drawTableHeader(thY, 16);
                     doc.font('Helvetica-Bold').fontSize(9).fillColor('#1f2937');
                     doc.text('Tanggal', 55, thY + 4);
@@ -240,13 +316,16 @@ class StudentCharacterService {
 
                     doc.font('Helvetica').fontSize(9).fillColor('#1f2937');
                     reportData.achievements.forEach((ach, index) => {
-                        if (doc.y > 760) { doc.addPage(); doc.y = 50; }
+                        const titleHeight = doc.heightOfString(ach.title || '-', { width: 220 });
+                        if (doc.y + titleHeight > 760) { doc.addPage(); doc.y = 50; }
                         const y = doc.y;
                         doc.text(ach.date ? new Date(ach.date).toLocaleDateString('id-ID') : '-', 55, y, { width: 65 });
                         doc.text(ach.title || '-', 125, y, { width: 220 });
                         doc.text(ach.level || '-', 355, y, { width: 75 });
                         doc.text(ach.rank || '-', 435, y, { width: 65 });
                         doc.text(`+${ach.points}`, 505, y, { width: 40 });
+                        
+                        doc.y = y + Math.max(titleHeight, 12);
                         doc.moveDown(0.3);
                         drawLine(doc.y);
                         doc.moveDown(0.3);
@@ -321,17 +400,17 @@ class StudentCharacterService {
 
                 doc.moveDown(5);
                 doc.font('Helvetica-Bold');
-                doc.text('Rendy Yani Susanto, S.Pd', 350, doc.y);
+                doc.text('Rendy Yani Susanto, S.Pd', 350, doc.y, { lineBreak: false });
 
                 // Footer numbering
-                let pages = doc.bufferedPageRange();
+                const pages = doc.bufferedPageRange();
                 for (let i = 0; i < pages.count; i++) {
                     doc.switchToPage(i);
                     doc.fontSize(8).fillColor('#9ca3af').text(
                         `Halaman ${i + 1} dari ${pages.count}`,
                         0,
                         doc.page.height - 30,
-                        { align: 'center' }
+                        { align: 'center', lineBreak: false }
                     );
                 }
 

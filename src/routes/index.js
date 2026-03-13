@@ -18,6 +18,8 @@ const achievementParticipantRoutes = require('../modules/achievements/achievemen
 const achievementResultRoutes = require('../modules/achievements/achievement_result.routes');
 const achievementPointRuleRoutes = require('../modules/achievements/achievement_point_rule.routes');
 
+const positivePointRoutes = require('../modules/positive-points/positive-points.routes');
+
 router.get('/ping', (req, res) => {
     res.json({ message: 'pong', timestamp: new Date() });
 });
@@ -29,6 +31,7 @@ router.use('/parents', parentRoutes);
 router.use('/documents', documentRoutes);
 router.use('/academic', academicRoutes);
 router.use('/violations', violationRoutes);
+router.use('/positive-points', positivePointRoutes);
 
 router.use('/achievements/participants', achievementParticipantRoutes);
 router.use('/achievements/results', achievementResultRoutes);
