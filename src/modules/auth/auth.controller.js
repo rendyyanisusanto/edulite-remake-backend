@@ -1,7 +1,7 @@
 'use strict';
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { User, Role } = require('../../models');
+const { User, Role, Permission } = require('../../models');
 const logger = require('../../core/logger');
 
 exports.login = async (req, res, next) => {
@@ -9,22 +9,41 @@ exports.login = async (req, res, next) => {
         const { email, password } = req.body;
 
         if (!email || !password) {
-            return res.status(400).json({ status: 'error', message: 'Email and password are required' });
+            return res.status(400).json({ success: false, message: 'Email and password are required' });
         }
 
         const user = await User.findOne({
             where: { email },
-            include: [{ model: Role, as: 'roles' }]
+            include: [{
+                model: Role,
+                as: 'roles',
+                include: [{
+                    model: Permission,
+                    as: 'permissions',
+                    through: { attributes: [] }
+                }]
+            }]
         });
 
         if (!user || !user.is_active) {
-            return res.status(401).json({ status: 'error', message: 'Invalid credentials or inactive user' });
+            return res.status(401).json({ success: false, message: 'Invalid credentials or inactive user' });
         }
 
         const isMatch = await bcrypt.compare(password, user.password_hash);
         if (!isMatch) {
-            return res.status(401).json({ status: 'error', message: 'Invalid credentials' });
+            return res.status(401).json({ success: false, message: 'Invalid credentials' });
         }
+
+        // Collect permissions
+        let isSuperAdmin = false;
+        const permSet = new Set();
+        for (const role of user.roles || []) {
+            if (role.name === 'SUPERADMIN') { isSuperAdmin = true; break; }
+            for (const perm of role.permissions || []) {
+                permSet.add(perm.code);
+            }
+        }
+        const permissions = isSuperAdmin ? ['*'] : Array.from(permSet);
 
         const payload = {
             id: user.id,
@@ -38,15 +57,17 @@ exports.login = async (req, res, next) => {
         logger.info(`User login successful: ${email}`);
 
         res.json({
-            status: 'success',
+            success: true,
             data: {
-                token,
+                access_token: token,
                 user: {
                     id: user.id,
                     name: user.name,
                     email: user.email,
-                    roles: payload.roles
-                }
+                    is_active: user.is_active
+                },
+                roles: payload.roles,
+                permissions
             }
         });
     } catch (err) {
@@ -58,14 +79,49 @@ exports.profile = async (req, res, next) => {
     try {
         const user = await User.findByPk(req.user.id, {
             attributes: ['id', 'name', 'email', 'is_active', 'last_login', 'created_at'],
-            include: [{ model: Role, as: 'roles', attributes: ['id', 'name'] }]
+            include: [{
+                model: Role,
+                as: 'roles',
+                attributes: ['id', 'name'],
+                include: [{
+                    model: Permission,
+                    as: 'permissions',
+                    attributes: ['id', 'code', 'name'],
+                    through: { attributes: [] }
+                }]
+            }]
         });
 
         if (!user) {
-            return res.status(404).json({ status: 'error', message: 'User not found' });
+            return res.status(404).json({ success: false, message: 'User not found' });
         }
 
-        res.json({ status: 'success', data: user });
+        // Collect permissions
+        let isSuperAdmin = false;
+        const permSet = new Set();
+        for (const role of user.roles || []) {
+            if (role.name === 'SUPERADMIN') { isSuperAdmin = true; break; }
+            for (const perm of role.permissions || []) {
+                permSet.add(perm.code);
+            }
+        }
+        const permissions = isSuperAdmin ? ['*'] : Array.from(permSet);
+
+        res.json({
+            success: true,
+            data: {
+                user: {
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    is_active: user.is_active,
+                    last_login: user.last_login,
+                    created_at: user.created_at
+                },
+                roles: user.roles.map(r => r.name),
+                permissions
+            }
+        });
     } catch (err) {
         next(err);
     }

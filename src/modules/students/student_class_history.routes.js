@@ -2,15 +2,16 @@ const express = require('express');
 const router = express.Router();
 const classHistoryController = require('./student_class_history.controller');
 const { authMiddleware } = require('../../core/middleware/auth.middleware');
+const { permissionMiddleware } = require('../../core/middleware/permission.middleware');
 
 // Apply auth middleware to all routes
 router.use(authMiddleware);
 
-router.get('/', classHistoryController.getAllClassHistories);
-router.get('/:id', classHistoryController.getClassHistoryById);
+router.get('/', permissionMiddleware('class_history.view'), classHistoryController.getAllClassHistories);
+router.get('/:id', permissionMiddleware('class_history.view'), classHistoryController.getClassHistoryById);
 
-router.post('/', classHistoryController.createClassHistory);
-router.put('/:id', classHistoryController.updateClassHistory);
-router.delete('/:id', classHistoryController.deleteClassHistory);
+router.post('/', permissionMiddleware('class_history.create'), classHistoryController.createClassHistory);
+router.put('/:id', permissionMiddleware('class_history.update'), classHistoryController.updateClassHistory);
+router.delete('/:id', permissionMiddleware('class_history.delete'), classHistoryController.deleteClassHistory);
 
 module.exports = router;
