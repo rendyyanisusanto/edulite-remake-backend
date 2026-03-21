@@ -4,10 +4,10 @@ const classHistoryController = require('./student_class_history.controller');
 const { authMiddleware } = require('../../core/middleware/auth.middleware');
 const { permissionMiddleware } = require('../../core/middleware/permission.middleware');
 
-// Apply auth middleware to all routes
 router.use(authMiddleware);
 
 router.get('/', permissionMiddleware('class_history.view'), classHistoryController.getAllClassHistories);
+router.get('/student/:student_id', permissionMiddleware('class_history.view'), classHistoryController.getStudentHistory);
 router.get('/:id', permissionMiddleware('class_history.view'), classHistoryController.getClassHistoryById);
 
 router.post('/', permissionMiddleware('class_history.create'), classHistoryController.createClassHistory);

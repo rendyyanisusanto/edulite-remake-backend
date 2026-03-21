@@ -8,7 +8,8 @@ exports.getAllClassHistories = async (req, res) => {
             search: req.query.search,
             academic_year_id: req.query.academic_year_id,
             grade_id: req.query.grade_id,
-            class_id: req.query.class_id
+            class_id: req.query.class_id,
+            assignment_type: req.query.assignment_type
         };
         const result = await studentClassHistoryService.getAll(filters);
         res.status(200).json({ success: true, data: result });
@@ -26,6 +27,15 @@ exports.getClassHistoryById = async (req, res) => {
     }
 };
 
+exports.getStudentHistory = async (req, res) => {
+    try {
+        const data = await studentClassHistoryService.getStudentHistory(req.params.student_id);
+        res.status(200).json({ success: true, data });
+    } catch (error) {
+        res.status(404).json({ success: false, message: error.message, error_code: 'NOT_FOUND' });
+    }
+};
+
 exports.createClassHistory = async (req, res) => {
     try {
         const data = { ...req.body, assigned_by: req.user.id };
@@ -38,8 +48,7 @@ exports.createClassHistory = async (req, res) => {
 
 exports.updateClassHistory = async (req, res) => {
     try {
-        const data = { ...req.body };
-        const history = await studentClassHistoryService.update(req.params.id, data);
+        const history = await studentClassHistoryService.update(req.params.id, req.body);
         res.status(200).json({ success: true, data: history, message: 'Riwayat kelas berhasil diperbarui' });
     } catch (error) {
         res.status(400).json({ success: false, message: error.message, error_code: 'BAD_REQUEST' });

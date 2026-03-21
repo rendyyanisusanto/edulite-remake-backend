@@ -357,9 +357,8 @@ module.exports = {
             { group: 'Disiplin & Konseling', name: 'Jenis Catatan Positif', route: '/positive-point-types', icon: 'thumb-up', permission_code: 'positive_point_type.view', sort_order: 4 },
             { group: 'Disiplin & Konseling', name: 'Catatan Positif Siswa', route: '/student-positive-points', icon: 'sparkles', permission_code: 'student_positive_point.view', sort_order: 5 },
             { group: 'Disiplin & Konseling', name: 'Kasus Konseling', route: '/counseling-cases', icon: 'chat-alt-2', permission_code: 'counseling_case.view', sort_order: 6 },
-            { group: 'Disiplin & Konseling', name: 'Sesi Konseling', route: '/counseling-sessions', icon: 'chat', permission_code: 'counseling_session.view', sort_order: 7 },
-            { group: 'Disiplin & Konseling', name: 'Tindak Lanjut Konseling', route: '/counseling-followups', icon: 'arrow-circle-right', permission_code: 'counseling_followup.view', sort_order: 8 },
-            { group: 'Disiplin & Konseling', name: 'Rapor Karakter', route: '/character-reports', icon: 'clipboard-list', permission_code: 'character_report.view', sort_order: 9 },
+            { group: 'Disiplin & Konseling', name: 'Tindak Lanjut Konseling', route: '/counseling-followups', icon: 'arrow-circle-right', permission_code: 'counseling_followup.view', sort_order: 7 },
+            { group: 'Disiplin & Konseling', name: 'Rapor Karakter', route: '/character-reports', icon: 'clipboard-list', permission_code: 'character_report.view', sort_order: 8 },
             // Administrasi
             { group: 'Administrasi', name: 'Buku Tamu', route: '/guestbooks', icon: 'book-open', permission_code: 'guestbook.view', sort_order: 1 },
             { group: 'Administrasi', name: 'Surat Izin Siswa', route: '/permission-letters', icon: 'mail', permission_code: 'permission_letter.view', sort_order: 2 },
