@@ -12,7 +12,7 @@ const puppeteer = require('puppeteer');
     await page.goto('http://localhost:5173/login', { waitUntil: 'networkidle2' });
 
     // Login
-    await page.type('#email', 'admin@edulite.local');
+    await page.type('#username', 'admin');
     await page.type('#password', 'password123');
     await page.click('button[type="submit"]');
 

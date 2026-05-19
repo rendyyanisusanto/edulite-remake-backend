@@ -23,7 +23,7 @@ class RoleService {
                 {
                     model: Permission,
                     as: 'permissions',
-                    attributes: ['id', 'code', 'name'],
+                    attributes: ['id', 'code', 'name', 'platform'],
                     through: { attributes: [] }
                 }
             ],
@@ -47,7 +47,7 @@ class RoleService {
                 {
                     model: Permission,
                     as: 'permissions',
-                    attributes: ['id', 'code', 'name', 'description'],
+                    attributes: ['id', 'code', 'name', 'description', 'platform'],
                     through: { attributes: [] }
                 }
             ]

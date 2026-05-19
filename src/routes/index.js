@@ -18,6 +18,7 @@ const parentRoutes = require('../modules/students/parent.routes');
 const documentRoutes = require('../modules/students/document.routes');
 const studentClassHistoryRoutes = require('../modules/students/student_class_history.routes');
 const classSetupRoutes = require('../modules/class-setup/class_setup.routes');
+const studentMutationRoutes = require('../modules/student-mutations/student_mutation.routes');
 
 // Academic
 const academicRoutes = require('../modules/academic/academic.routes');
@@ -39,8 +40,20 @@ const permissionLetterRoutes = require('../modules/permission-letters/permission
 const guestbookRoutes = require('../modules/guestbook/guestbook.routes');
 
 // Attendance
+const mobileRoutes = require('../modules/mobile/mobile.routes');
 const attendanceRoutes = require('../modules/attendance/attendance.routes');
+const studentAttendanceRoutes = require('../modules/student-attendance/student_attendance.routes');
+const studentToiletRoutes = require('../modules/student-toilet/student_toilet.routes');
+const extracurricularRoutes = require('../modules/extracurricular/extracurricular.routes');
+const extracurricularReportRoutes = require('../modules/extracurricular/report.routes');
+const myExtracurricularRoutes = require('../modules/extracurricular/my_extracurricular.routes');
 
+// Settings
+const schoolProfileRoutes = require('../modules/school-profile/school_profile.routes');
+const documentSettingRoutes = require('../modules/document-settings/document_setting.routes');
+const studentItemDepositRoutes = require('../modules/student-item-deposits/student_item_deposit.routes');
+const studentItemReportRoutes = require('../modules/student-item-deposits/student_item_report.routes');
+const studentItemReceiptRoutes = require('../modules/student-item-deposits/student_item_receipt.routes');
 
 router.get('/ping', (req, res) => {
     res.json({ message: 'pong', timestamp: new Date() });
@@ -61,6 +74,7 @@ router.use('/class-histories', studentClassHistoryRoutes);
 router.use('/class-setup', classSetupRoutes);
 router.use('/parents', parentRoutes);
 router.use('/documents', documentRoutes);
+router.use('/student-mutations', studentMutationRoutes);
 
 // Academic
 router.use('/academic', academicRoutes);
@@ -85,8 +99,24 @@ router.use('/achievements/results', achievementResultRoutes);
 router.use('/achievements/point-rules', achievementPointRuleRoutes);
 router.use('/achievements', achievementMainRoutes);
 
+// Mobile
+router.use('/mobile', mobileRoutes);
+
 // Attendance
 router.use('/attendance', attendanceRoutes);
+router.use('/', studentAttendanceRoutes);
+router.use('/', studentToiletRoutes);
+router.use('/extracurricular/reports', extracurricularReportRoutes);
+router.use('/extracurricular', extracurricularRoutes);
+router.use('/my/extracurricular', myExtracurricularRoutes);
+
+// Settings
+router.use('/settings/school-profile', schoolProfileRoutes);
+router.use('/settings/document-settings', documentSettingRoutes);
+router.use('/', studentItemDepositRoutes.kioskRouter);
+router.use('/', studentItemDepositRoutes.router);
+router.use('/', studentItemReportRoutes);
+router.use('/', studentItemReceiptRoutes);
 
 module.exports = router;
 

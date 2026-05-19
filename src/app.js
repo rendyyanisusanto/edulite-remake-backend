@@ -13,6 +13,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use('/public', express.static(path.join(__dirname, '../public')));
+app.use('/api/v1', routes);
 app.use('/api', routes);
 
 app.use(errorMiddleware);

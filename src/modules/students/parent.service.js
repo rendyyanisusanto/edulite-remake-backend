@@ -1,4 +1,4 @@
-const { ParentProfile, Student } = require('../../models');
+const { ParentProfile, Student, ParentDocument } = require('../../models');
 
 class ParentProfileService {
     async findAll(query) {
@@ -7,7 +7,10 @@ class ParentProfileService {
         const offset = (page - 1) * limit;
 
         const parents = await ParentProfile.findAndCountAll({
-            include: [{ model: Student, as: 'student', attributes: ['id', 'nis', 'full_name'] }],
+            include: [
+                { model: Student, as: 'student', attributes: ['id', 'nis', 'full_name'] },
+                { model: ParentDocument, as: 'documents' }
+            ],
             limit,
             offset,
             order: [['created_at', 'DESC']]
@@ -23,7 +26,10 @@ class ParentProfileService {
 
     async findById(id) {
         const parent = await ParentProfile.findByPk(id, {
-            include: [{ model: Student, as: 'student' }]
+            include: [
+                { model: Student, as: 'student' },
+                { model: ParentDocument, as: 'documents' }
+            ]
         });
         if (!parent) throw new Error(`Parent with id ${id} not found`);
         return parent;

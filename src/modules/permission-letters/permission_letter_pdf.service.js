@@ -24,7 +24,7 @@ async function fetchPrintData(id) {
     const {
         PermissionLetter, PermissionLetterStudent,
         Teacher, Student, User,
-        StudentClassHistory, Class
+        StudentClassHistory, Class, SchoolProfile
     } = db;
 
     const letter = await PermissionLetter.findByPk(id, {
@@ -64,12 +64,14 @@ async function fetchPrintData(id) {
     });
 
     if (!letter) throw new Error('Surat izin tidak ditemukan');
-    return letter;
+
+    const profile = await SchoolProfile.findOne();
+    return { letter, profile };
 }
 
 // ─── PDF Generator ────────────────────────────────────────────────────────────
 
-function generatePdf(letter) {
+function generatePdf(data) {
     return new Promise((resolve, reject) => {
         const doc = new PDFDocument({
             size: 'A4',
@@ -85,11 +87,11 @@ function generatePdf(letter) {
 
         // Page 1 – Official Letter
         doc.addPage();
-        _renderPage1(doc, letter);
+        _renderPage1(doc, data.letter, data.profile);
 
         // Page 2 – Student List Attachment
         doc.addPage();
-        _renderPage2(doc, letter);
+        _renderPage2(doc, data.letter, data.profile);
 
         doc.end();
     });
@@ -108,7 +110,7 @@ function _drawHeader(doc) {
 
 // ─── Page 1: Official Letter ──────────────────────────────────────────────────
 
-function _renderPage1(doc, letter) {
+function _renderPage1(doc, letter, profile) {
     const FS = 10;
     const LH = 14;   // line height for 10pt
 
@@ -123,7 +125,7 @@ function _renderPage1(doc, letter) {
             : letter.created_at.toISOString().slice(0, 10))
         : new Date().toISOString().slice(0, 10);
     const letterDate = formatTanggalIndo(rawDate);
-    const city = 'Malang';
+    const city = profile?.city || 'Malang';
 
     // ── Nomor / Lampiran / Hal (left) + City & Date (top-right, same Y) ──────
     const lblW   = 65;
@@ -253,13 +255,29 @@ function _renderPage1(doc, letter) {
 
     // Space for physical signature
     const signerY = y + 55;
-    // Use approver name if set and not a system account, otherwise fall back to school principal
+    // Use principal name from profile as primary choice for "Kepala Sekolah" signature
+    // Fall back to approver name only if principal name is not set and approver is not a system account
     const approverName = letter.approver?.name;
-    const signerName = (approverName && approverName.toLowerCase() !== 'superadmin')
-        ? approverName
-        : 'Avi Hendratmoko, S.Kom';
+    const systemNames = ['superadmin', 'super admin', 'admin', 'administrator', 'system'];
+    const lowerApprover = approverName?.toLowerCase() || '';
+    const isSystemApprover = systemNames.includes(lowerApprover) || lowerApprover.includes('admin');
+
+    let signerName = profile?.principal_name;
+    if (!signerName) {
+        signerName = (!isSystemApprover && approverName) ? approverName : 'Avi Hendratmoko, S.Kom';
+    }
+    
+    // Determine if we should show NIP (only if it's the principal from profile)
+    const showingPrincipalFromProfile = !!profile?.principal_name;
+    
     doc.font('Helvetica-Bold').fontSize(FS)
         .text(signerName, sigX, signerY, { width: sigW, align: 'center', lineBreak: false });
+    
+    if (showingPrincipalFromProfile && profile?.principal_nip) {
+        y = signerY + LH;
+        doc.font('Helvetica').fontSize(FS)
+            .text(`NIP. ${profile.principal_nip}`, sigX, y, { width: sigW, align: 'center', lineBreak: false });
+    }
 
     // ── Tembusan (left) ───────────────────────────────────────────────────────
     const tY = y + 20;
@@ -271,7 +289,7 @@ function _renderPage1(doc, letter) {
 
 // ─── Page 2: Student List Attachment ─────────────────────────────────────────
 
-function _renderPage2(doc, letter) {
+function _renderPage2(doc, letter, profile) {
     const FS     = 10;
     const LH     = 14;
     const ROW_H  = 20;

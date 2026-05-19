@@ -186,7 +186,17 @@ module.exports = {
             ['permission.delete', 'Delete Permission', 'Delete permission'],
             // Menu Management
             ['menu.view', 'View Menus', 'View menu structure'],
-            ['menu.manage', 'Manage Menus', 'Manage menu visibility and permissions']
+            ['menu.manage', 'Manage Menus', 'Manage menu visibility and permissions'],
+            // Additional
+            ['class_assignment.view', 'View Class Assignment', 'Access class setup / assignment page'],
+            ['class_assignment.manage', 'Manage Class Assignment', 'Process student class placement'],
+            // Attendance
+            ['attendance.shift.view', 'View Attendance Shifts', 'View attendance shift list'],
+            ['attendance.setting.view', 'View Attendance Settings', 'View attendance settings'],
+            ['attendance.monitor.view', 'View Attendance Monitoring', 'Access attendance monitoring'],
+            ['attendance.history.view', 'View Attendance History', 'View attendance history'],
+            ['attendance.report.view', 'View Attendance Reports', 'View attendance reports'],
+            ['attendance.request.view', 'View Attendance Requests', 'View attendance requests']
         ];
 
         const permissions = permDefs.map(([code, name, description]) => ({
@@ -199,6 +209,7 @@ module.exports = {
         const passwordHash = await bcrypt.hash('password123', 10);
         await queryInterface.bulkInsert('users', [{
             name: 'Super Admin',
+            username: 'admin',
             email: 'admin@edulite.local',
             password_hash: passwordHash,
             is_active: true,
@@ -264,12 +275,13 @@ module.exports = {
             'user.view','user.create','user.update','user.reset_password','user.assign_role',
             'role.view','role.create','role.update','role.assign_permission',
             'permission.view',
-            'menu.view','menu.manage'
+            'menu.view','menu.manage',
+            'attendance.shift.view','attendance.setting.view','attendance.monitor.view','attendance.history.view','attendance.report.view','attendance.request.view'
         ];
 
         const guruCodes = [
             'dashboard.view',
-            'student.view','parent.view','student_document.view','class_history.view','id_card.view',
+            'student.view','student.create','student.update','student.delete','parent.view','student_document.view','class_history.view','id_card.view',
             'academic_year.view','grade.view','department.view','class.view','teacher.view',
             'achievement.view','achievement.create','achievement.update',
             'achievement_participant.view','achievement_participant.create','achievement_participant.update',
@@ -303,6 +315,7 @@ module.exports = {
             .map(c => ({ role_id: roleId, permission_id: permMap[c] }));
 
         const rpRecords = [
+            ...allPerms.map(p => ({ role_id: roleMap['SUPERADMIN'], permission_id: p.id })),
             ...buildRP(roleMap['ADMIN'], adminCodes),
             ...buildRP(roleMap['GURU'], guruCodes),
             ...buildRP(roleMap['SISWA'], siswaCodes),
@@ -320,7 +333,8 @@ module.exports = {
             { name: 'Prestasi & Kegiatan', icon: 'star', sort_order: 3, created_at: now },
             { name: 'Disiplin & Konseling', icon: 'shield-check', sort_order: 4, created_at: now },
             { name: 'Administrasi', icon: 'office-building', sort_order: 5, created_at: now },
-            { name: 'Sistem', icon: 'cog', sort_order: 6, created_at: now }
+            { name: 'Absensi', icon: 'clock', sort_order: 6, created_at: now },
+            { name: 'Sistem', icon: 'cog', sort_order: 7, created_at: now }
         ], { ignoreDuplicates: true });
 
         // ─── 7. MENUS ─────────────────────────────────────────────────────────
@@ -336,8 +350,9 @@ module.exports = {
             { group: 'Manajemen Siswa', name: 'Orang Tua / Wali', route: '/parents', icon: 'users', permission_code: 'parent.view', sort_order: 2 },
             { group: 'Manajemen Siswa', name: 'Dokumen Siswa', route: '/student-docs', icon: 'document', permission_code: 'student_document.view', sort_order: 3 },
             { group: 'Manajemen Siswa', name: 'Riwayat Kelas', route: '/class-history', icon: 'clock', permission_code: 'class_history.view', sort_order: 4 },
-            { group: 'Manajemen Siswa', name: 'Mutasi Siswa', route: '/transfers', icon: 'switch-horizontal', permission_code: 'student_transfer.view', sort_order: 5 },
-            { group: 'Manajemen Siswa', name: 'Kartu Pelajar', route: '/id-cards', icon: 'identification', permission_code: 'id_card.view', sort_order: 6 },
+            { group: 'Manajemen Siswa', name: 'Penempatan Kelas', route: '/class-setup', icon: 'collection', permission_code: 'class_assignment.view', sort_order: 5 },
+            { group: 'Manajemen Siswa', name: 'Mutasi Siswa', route: '/transfers', icon: 'switch-horizontal', permission_code: 'student_transfer.view', sort_order: 6 },
+            { group: 'Manajemen Siswa', name: 'Kartu Pelajar', route: '/id-cards', icon: 'identification', permission_code: 'id_card.view', sort_order: 7 },
             // Akademik
             { group: 'Akademik', name: 'Tahun Ajaran', route: '/academic-years', icon: 'calendar', permission_code: 'academic_year.view', sort_order: 1 },
             { group: 'Akademik', name: 'Tingkat Kelas', route: '/grades', icon: 'chart-bar', permission_code: 'grade.view', sort_order: 2 },
@@ -368,7 +383,14 @@ module.exports = {
             // Sistem
             { group: 'Sistem', name: 'Manajemen Pengguna', route: '/users', icon: 'user-circle', permission_code: 'user.view', sort_order: 1 },
             { group: 'Sistem', name: 'Manajemen Role', route: '/roles', icon: 'shield', permission_code: 'role.view', sort_order: 2 },
-            { group: 'Sistem', name: 'Hak Akses', route: '/permissions', icon: 'key', permission_code: 'permission.view', sort_order: 3 }
+            { group: 'Sistem', name: 'Hak Akses', route: '/permissions', icon: 'key', permission_code: 'permission.view', sort_order: 3 },
+            // Absensi
+            { group: 'Absensi', name: 'Master Shift', route: '/attendance/shifts', icon: 'adjustments', permission_code: 'attendance.shift.view', sort_order: 1 },
+            { group: 'Absensi', name: 'Pengaturan Absensi', route: '/attendance/settings', icon: 'cog', permission_code: 'attendance.setting.view', sort_order: 2 },
+            { group: 'Absensi', name: 'Monitoring Absensi', route: '/attendance/monitoring', icon: 'eye', permission_code: 'attendance.monitor.view', sort_order: 3 },
+            { group: 'Absensi', name: 'Riwayat Absensi', route: '/attendance/history', icon: 'clock', permission_code: 'attendance.history.view', sort_order: 4 },
+            { group: 'Absensi', name: 'Laporan Absensi', route: '/attendance/reports', icon: 'chart-bar', permission_code: 'attendance.report.view', sort_order: 5 },
+            { group: 'Absensi', name: 'Pengajuan Absensi', route: '/attendance/requests', icon: 'clipboard-check', permission_code: 'attendance.request.view', sort_order: 6 }
         ];
 
         const menuRows = menuDefs

@@ -5,15 +5,20 @@ module.exports = (sequelize, DataTypes) => {
     class StudentMutation extends Model {
         static associate(models) {
             StudentMutation.belongsTo(models.Student, { foreignKey: 'student_id', as: 'student' });
+            StudentMutation.belongsTo(models.AcademicYear, { foreignKey: 'academic_year_id', as: 'academic_year' });
             StudentMutation.belongsTo(models.User, { foreignKey: 'created_by', as: 'creator' });
             StudentMutation.belongsTo(models.User, { foreignKey: 'updated_by', as: 'updater' });
             StudentMutation.belongsTo(models.User, { foreignKey: 'approved_by', as: 'approver' });
+            StudentMutation.hasMany(models.StudentMutationLog, { foreignKey: 'mutation_id', as: 'logs' });
         }
     }
     StudentMutation.init({
         student_id: {
             type: DataTypes.INTEGER,
             allowNull: false
+        },
+        academic_year_id: {
+            type: DataTypes.INTEGER
         },
         mutation_type: {
             type: DataTypes.STRING(10),

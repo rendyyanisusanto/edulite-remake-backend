@@ -4,6 +4,7 @@ const db = require('../../models');
 const { StudentClassHistory, Student, Grade, Class, Teacher } = db;
 const { Op } = require('sequelize');
 const sequelize = db.sequelize;
+const { ensureStudentActiveForTransaction } = require('../students/student_status.helper');
 
 class ClassSetupService {
 
@@ -184,6 +185,10 @@ class ClassSetupService {
             if (newStudentIds.length === 0) {
                 await transaction.rollback();
                 return { assigned: 0, skipped: student_ids.length, message: 'Semua siswa sudah memiliki kelas di tahun ajaran ini.' };
+            }
+
+            for (const studentId of newStudentIds) {
+                await ensureStudentActiveForTransaction(studentId);
             }
 
             const records = newStudentIds.map(student_id => ({

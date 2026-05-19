@@ -1,8 +1,36 @@
 const { Teacher, User } = require('../../models');
 const { Op } = require('sequelize');
 const bcrypt = require('bcryptjs');
+const minioSvc = require('../../core/services/minio.service');
+
+const PHOTO_FOLDER = 'teachers/photos';
 
 class TeacherService {
+    _normalizeUsername(value) {
+        return String(value || '')
+            .toLowerCase()
+            .replace(/[^a-z0-9._-]+/g, '_')
+            .replace(/^_+|_+$/g, '')
+            .slice(0, 50);
+    }
+
+    async _generateUniqueUsername(baseInput, excludeUserId = null) {
+        const base = this._normalizeUsername(baseInput) || 'guru';
+        let candidate = base;
+        let counter = 1;
+
+        while (true) {
+            const where = { username: candidate };
+            if (excludeUserId) where.id = { [Op.ne]: excludeUserId };
+            const existing = await User.findOne({ where });
+            if (!existing) return candidate;
+
+            const suffix = `_${counter}`;
+            candidate = `${base.slice(0, 50 - suffix.length)}${suffix}`;
+            counter += 1;
+        }
+    }
+
     async findAll(query) {
         const page = parseInt(query.page) || 1;
         const limit = parseInt(query.limit) || 10;
@@ -46,8 +74,10 @@ class TeacherService {
         let userId = null;
         if (data.email) {
             const passwordHash = await bcrypt.hash(data.password || 'guru123', 10);
+            const username = await this._generateUniqueUsername(data.email.split('@')[0] || data.full_name);
             const user = await User.create({
                 name: data.full_name,
+                username,
                 email: data.email,
                 password_hash: passwordHash,
                 is_active: true
@@ -59,7 +89,12 @@ class TeacherService {
         }
 
         return await Teacher.create({
-            ...data,
+            nip: data.nip || null,
+            full_name: data.full_name,
+            gender: data.gender || 'L',
+            phone: data.phone || null,
+            position: data.position || null,
+            photo: data.photo || null,
             user_id: userId
         });
     }
@@ -76,7 +111,39 @@ class TeacherService {
             }
         }
 
-        return await item.update(data);
+        return await item.update({
+            nip: data.nip !== undefined ? data.nip : item.nip,
+            full_name: data.full_name !== undefined ? data.full_name : item.full_name,
+            gender: data.gender !== undefined ? data.gender : item.gender,
+            phone: data.phone !== undefined ? data.phone : item.phone,
+            position: data.position !== undefined ? data.position : item.position,
+            photo: data.photo !== undefined ? data.photo : item.photo
+        });
+    }
+
+    async uploadPhoto(id, file) {
+        const item = await this.findById(id);
+
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
+            throw new Error('Hanya file JPEG, PNG, dan WebP yang diperbolehkan');
+        }
+
+        if (file.size > 2 * 1024 * 1024) {
+            throw new Error('Ukuran file maksimal 2 MB');
+        }
+
+        // Upload to Minio
+        const publicUrl = await minioSvc.uploadFile(PHOTO_FOLDER, file.originalname, file.buffer, file.mimetype);
+
+        // Delete old photo if exists
+        if (item.photo) {
+            await minioSvc.deleteFile(item.photo);
+        }
+
+        // Update record
+        await item.update({ photo: publicUrl });
+
+        return { url: publicUrl };
     }
 
     async delete(id) {

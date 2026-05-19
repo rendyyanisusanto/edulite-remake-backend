@@ -29,6 +29,11 @@ module.exports = (sequelize, DataTypes) => {
         },
         description: {
             type: DataTypes.TEXT
+        },
+        platform: {
+            type: DataTypes.ENUM('WEB', 'MOBILE', 'BOTH'),
+            allowNull: false,
+            defaultValue: 'BOTH'
         }
     }, {
         sequelize,

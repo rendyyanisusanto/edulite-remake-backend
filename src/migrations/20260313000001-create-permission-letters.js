@@ -113,11 +113,18 @@ module.exports = {
             }
         });
 
-        await queryInterface.addConstraint('permission_letter_students', {
-            fields: ['permission_letter_id', 'student_id'],
-            type: 'unique',
-            name: 'unique_permission_letter_student'
-        });
+        try {
+            await queryInterface.addConstraint('permission_letter_students', {
+                fields: ['permission_letter_id', 'student_id'],
+                type: 'unique',
+                name: 'unique_permission_letter_student'
+            });
+        } catch (error) {
+            if (error.name !== 'SequelizeDatabaseError' || !error.message.includes('Duplicate key name')) {
+                throw error;
+            }
+            console.log('  Constraint unique_permission_letter_student already exists, skipping...');
+        }
     },
 
     async down(queryInterface, Sequelize) {

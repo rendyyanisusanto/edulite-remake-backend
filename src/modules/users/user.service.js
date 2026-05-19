@@ -4,6 +4,31 @@ const { User, Role, UserRole, Permission } = require('../../models');
 const { Op } = require('sequelize');
 
 class UserService {
+    _normalizeUsername(value) {
+        return String(value || '')
+            .toLowerCase()
+            .replace(/[^a-z0-9._-]+/g, '_')
+            .replace(/^_+|_+$/g, '')
+            .slice(0, 50);
+    }
+
+    async _generateUniqueUsername(baseInput, excludeUserId = null) {
+        const base = this._normalizeUsername(baseInput) || 'user';
+        let candidate = base;
+        let counter = 1;
+
+        while (true) {
+            const where = { username: candidate };
+            if (excludeUserId) where.id = { [Op.ne]: excludeUserId };
+            const existing = await User.findOne({ where });
+            if (!existing) return candidate;
+
+            const suffix = `_${counter}`;
+            candidate = `${base.slice(0, 50 - suffix.length)}${suffix}`;
+            counter += 1;
+        }
+    }
+
     async findAll(query) {
         const page = parseInt(query.page) || 1;
         const limit = parseInt(query.limit) || 10;
@@ -15,6 +40,7 @@ class UserService {
         if (search) {
             where[Op.or] = [
                 { name: { [Op.like]: `%${search}%` } },
+                { username: { [Op.like]: `%${search}%` } },
                 { email: { [Op.like]: `%${search}%` } }
             ];
         }
@@ -64,7 +90,7 @@ class UserService {
     }
 
     async create(data) {
-        const { name, email, password, is_active = true } = data;
+        const { name, username, email, password, is_active = true } = data;
 
         if (!name) throw Object.assign(new Error('Name is required'), { statusCode: 400 });
         if (!email) throw Object.assign(new Error('Email is required'), { statusCode: 400 });
@@ -77,8 +103,9 @@ class UserService {
         const existing = await User.findOne({ where: { email } });
         if (existing) throw Object.assign(new Error('Email already exists'), { statusCode: 409 });
 
+        const uniqueUsername = await this._generateUniqueUsername(username || email.split('@')[0]);
         const password_hash = await bcrypt.hash(password, 10);
-        const user = await User.create({ name, email, password_hash, is_active });
+        const user = await User.create({ name, username: uniqueUsername, email, password_hash, is_active });
 
         return await this.findById(user.id);
     }
@@ -87,7 +114,12 @@ class UserService {
         const user = await User.findByPk(id);
         if (!user) throw Object.assign(new Error('User not found'), { statusCode: 404 });
 
-        const { name, email, is_active } = data;
+        const { name, username, email, is_active } = data;
+
+        let resolvedUsername = user.username;
+        if (username !== undefined && username !== user.username) {
+            resolvedUsername = await this._generateUniqueUsername(username, id);
+        }
 
         if (email && email !== user.email) {
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -99,6 +131,7 @@ class UserService {
 
         await user.update({
             name: name !== undefined ? name : user.name,
+            username: resolvedUsername,
             email: email !== undefined ? email : user.email,
             is_active: is_active !== undefined ? is_active : user.is_active
         });

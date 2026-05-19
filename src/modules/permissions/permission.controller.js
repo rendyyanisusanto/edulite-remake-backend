@@ -10,7 +10,7 @@ exports.findAll = async (req, res, next) => {
 
 exports.findAllGrouped = async (req, res, next) => {
     try {
-        const data = await svc.findAllGrouped();
+        const data = await svc.findAllGrouped(req.query);
         res.json({ success: true, data });
     } catch (e) { next(e); }
 };

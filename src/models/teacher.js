@@ -5,6 +5,7 @@ module.exports = (sequelize, DataTypes) => {
     class Teacher extends Model {
         static associate(models) {
             Teacher.belongsTo(models.User, { foreignKey: 'user_id', as: 'user' });
+            Teacher.hasMany(models.ExtracurricularCoach, { foreignKey: 'teacher_id', as: 'extracurricular_coach_profiles' });
         }
     }
     Teacher.init({
@@ -28,6 +29,10 @@ module.exports = (sequelize, DataTypes) => {
         },
         phone: {
             type: DataTypes.STRING(20)
+        },
+        photo: {
+            type: DataTypes.STRING(255),
+            allowNull: true
         }
     }, {
         sequelize,

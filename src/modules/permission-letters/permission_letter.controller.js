@@ -26,8 +26,19 @@ exports.findById = async (req, res, next) => {
 
 exports.create = async (req, res, next) => {
     try {
+        const { Teacher } = require('../../models');
+        let teacherId = null;
+
+        if (req.user?.id) {
+            const teacher = await Teacher.findOne({ where: { user_id: req.user.id } });
+            if (teacher) {
+                teacherId = teacher.id;
+            }
+        }
+
         const data = {
             ...req.body,
+            teacher_id: teacherId, // Securely injected from session
             created_by: req.user?.id,
             updated_by: req.user?.id
         };
@@ -42,8 +53,11 @@ exports.create = async (req, res, next) => {
 
 exports.update = async (req, res, next) => {
     try {
+        // Strip teacher_id from body to prevent tampering during updates
+        const { teacher_id, ...safeBody } = req.body;
+        
         const data = {
-            ...req.body,
+            ...safeBody,
             updated_by: req.user?.id
         };
         const item = await svc.update(req.params.id, data);
@@ -92,10 +106,10 @@ exports.delete = async (req, res, next) => {
 
 exports.printPdf = async (req, res, next) => {
     try {
-        const letter = await pdfSvc.fetchPrintData(req.params.id);
-        const pdfBuffer = await pdfSvc.generatePdf(letter);
+        const data = await pdfSvc.fetchPrintData(req.params.id);
+        const pdfBuffer = await pdfSvc.generatePdf(data);
 
-        const filename = `surat-izin-${letter.code || req.params.id}.pdf`
+        const filename = `surat-izin-${data.letter.code || req.params.id}.pdf`
             .replace(/\//g, '-')
             .replace(/\s+/g, '_');
 

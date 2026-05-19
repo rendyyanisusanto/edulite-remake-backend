@@ -1,0 +1,28 @@
+
+[4mSequelize CLI [Node: 25.2.1, CLI: 6.6.5, ORM: 6.37.8][24m
+
+[dotenv@17.3.1] injecting env (8) from .env -- tip: ≡ƒ¢á∩╕Å  run anywhere with `dotenvx run -- yourcommand`
+Loaded configuration file "src\config\database.js".
+Using environment "development".
+up 20260310000001-create-users.js
+up 20260310000002-create-roles.js
+up 20260310000003-create-permissions.js
+up 20260310000004-create-sessions.js
+up 20260310000005-create-menus.js
+up 20260310000006-create-students.js
+up 20260310000007-create-student-related.js
+up 20260310000008-create-academic.js
+up 20260310000009-create-achievements.js
+up 20260310000010-create-guestbooks.js
+up 20260310000011-create-violations.js
+up 20260310000012-create-counseling.js
+up 20260311100000-update-achievements.js
+up 20260312000001-create-positive-points.js
+down 20260313000001-create-permission-letters.js
+down 20260319142722-create-student-mutations.js
+down 20260320100001-create-attendance-shifts.js
+down 20260320100002-create-attendance-settings.js
+down 20260320100003-create-attendance-locations.js
+down 20260320100004-create-user-attendances.js
+down 20260320100005-create-attendance-requests.js
+down 20260320100006-create-attendance-request-logs.js

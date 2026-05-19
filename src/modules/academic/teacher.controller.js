@@ -34,3 +34,11 @@ exports.delete = async (req, res, next) => {
         res.json({ success: true, message: 'Deleted successfully' });
     } catch (err) { next(err); }
 };
+
+exports.uploadPhoto = async (req, res, next) => {
+    try {
+        if (!req.file) throw new Error('File tidak ditemukan');
+        const result = await teacherService.uploadPhoto(req.params.id, req.file);
+        res.json({ success: true, message: 'Foto berhasil diupload', data: result });
+    } catch (err) { next(err); }
+};

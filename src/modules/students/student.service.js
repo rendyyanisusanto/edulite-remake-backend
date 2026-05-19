@@ -1,8 +1,189 @@
-const { Student, ParentProfile, StudentDocument, StudentClassHistory, Class } = require('../../models');
+const {
+    Student,
+    ParentProfile,
+    ParentDocument,
+    StudentDocument,
+    StudentClassHistory,
+    Class,
+    sequelize
+} = require('../../models');
 const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
 
 class StudentService {
+    pickStudentPayload(data = {}, partial = false) {
+        const payload = {};
+        const fields = [
+            'nis',
+            'nisn',
+            'full_name',
+            'gender',
+            'date_of_birth',
+            'address',
+            'rfid_code',
+            'rfid_is_active',
+            'rfid_assigned_at',
+            'qr_code',
+            'barcode',
+            'card_template_id',
+            'card_number',
+            'photo'
+        ];
+
+        for (const field of fields) {
+            if (!partial || Object.prototype.hasOwnProperty.call(data, field)) {
+                payload[field] = data[field] ?? null;
+            }
+        }
+
+        return payload;
+    }
+
+    pickParentPayload(data = {}) {
+        return {
+            type: data.type || null,
+            full_name: data.full_name || null,
+            nik: data.nik || null,
+            phone: data.phone || null,
+            email: data.email || null,
+            occupation: data.occupation || null,
+            education: data.education || null,
+            is_guardian: Boolean(data.is_guardian),
+            address: data.address || null
+        };
+    }
+
+    pickParentDocumentPayload(data = {}) {
+        return {
+            document_type: data.document_type || null,
+            document_file: data.document_file || null
+        };
+    }
+
+    hasParentData(parent = {}) {
+        const fields = [
+            'type',
+            'full_name',
+            'nik',
+            'phone',
+            'email',
+            'occupation',
+            'education',
+            'address'
+        ];
+
+        if (parent.is_guardian === true) return true;
+        if (Array.isArray(parent.documents) && parent.documents.length > 0) {
+            return parent.documents.some((doc) => this.hasParentDocumentData(doc));
+        }
+
+        return fields.some((field) => String(parent[field] || '').trim() !== '');
+    }
+
+    hasParentDocumentData(doc = {}) {
+        return ['document_type', 'document_file'].some(
+            (field) => String(doc[field] || '').trim() !== ''
+        );
+    }
+
+    async syncParentDocuments(parentId, documents = [], transaction) {
+        const existingDocs = await ParentDocument.findAll({
+            where: { parent_id: parentId },
+            transaction
+        });
+        const existingDocMap = new Map(existingDocs.map((doc) => [doc.id, doc]));
+        const retainedDocIds = [];
+
+        for (const docInput of documents) {
+            if (!this.hasParentDocumentData(docInput)) {
+                continue;
+            }
+
+            const payload = this.pickParentDocumentPayload(docInput);
+            const inputId = docInput.id ? Number(docInput.id) : null;
+
+            if (inputId && existingDocMap.has(inputId)) {
+                const existingDoc = existingDocMap.get(inputId);
+                await existingDoc.update(payload, { transaction });
+                retainedDocIds.push(existingDoc.id);
+            } else {
+                const createdDoc = await ParentDocument.create(
+                    {
+                        ...payload,
+                        parent_id: parentId
+                    },
+                    { transaction }
+                );
+                retainedDocIds.push(createdDoc.id);
+            }
+        }
+
+        const deletedDocIds = existingDocs
+            .map((doc) => doc.id)
+            .filter((id) => !retainedDocIds.includes(id));
+
+        if (deletedDocIds.length > 0) {
+            await ParentDocument.destroy({
+                where: {
+                    id: deletedDocIds,
+                    parent_id: parentId
+                },
+                transaction
+            });
+        }
+    }
+
+    async syncParents(studentId, parents = [], transaction) {
+        const existingParents = await ParentProfile.findAll({
+            where: { student_id: studentId },
+            include: [{ model: ParentDocument, as: 'documents' }],
+            transaction
+        });
+        const existingParentMap = new Map(existingParents.map((parent) => [parent.id, parent]));
+        const retainedParentIds = [];
+
+        for (const parentInput of parents) {
+            if (!this.hasParentData(parentInput)) {
+                continue;
+            }
+
+            const payload = this.pickParentPayload(parentInput);
+            const documents = Array.isArray(parentInput.documents) ? parentInput.documents : [];
+            const inputId = parentInput.id ? Number(parentInput.id) : null;
+
+            let parentRecord;
+            if (inputId && existingParentMap.has(inputId)) {
+                parentRecord = existingParentMap.get(inputId);
+                await parentRecord.update(payload, { transaction });
+            } else {
+                parentRecord = await ParentProfile.create(
+                    {
+                        ...payload,
+                        student_id: studentId
+                    },
+                    { transaction }
+                );
+            }
+
+            retainedParentIds.push(parentRecord.id);
+            await this.syncParentDocuments(parentRecord.id, documents, transaction);
+        }
+
+        const deletedParentIds = existingParents
+            .map((parent) => parent.id)
+            .filter((id) => !retainedParentIds.includes(id));
+
+        if (deletedParentIds.length > 0) {
+            await ParentProfile.destroy({
+                where: {
+                    id: deletedParentIds,
+                    student_id: studentId
+                },
+                transaction
+            });
+        }
+    }
+
     async findAll(query) {
         const page = parseInt(query.page) || 1;
         const limit = parseInt(query.limit) || 10;
@@ -51,7 +232,11 @@ class StudentService {
     async findById(id) {
         const student = await Student.findByPk(id, {
             include: [
-                { model: ParentProfile, as: 'parents' },
+                {
+                    model: ParentProfile,
+                    as: 'parents',
+                    include: [{ model: ParentDocument, as: 'documents' }]
+                },
                 { model: StudentDocument, as: 'documents' }
             ]
         });
@@ -62,13 +247,43 @@ class StudentService {
     }
 
     async create(data) {
-        // Validation could be added here or in middleware
-        return await Student.create(data);
+        const transaction = await sequelize.transaction();
+        try {
+            const studentPayload = this.pickStudentPayload(data);
+            const parents = Array.isArray(data.parents) ? data.parents : [];
+
+            const student = await Student.create(studentPayload, { transaction });
+            await this.syncParents(student.id, parents, transaction);
+
+            await transaction.commit();
+            return await this.findById(student.id);
+        } catch (error) {
+            await transaction.rollback();
+            throw error;
+        }
     }
 
     async update(id, data) {
-        const student = await this.findById(id);
-        return await student.update(data);
+        const transaction = await sequelize.transaction();
+        try {
+            const student = await Student.findByPk(id, { transaction });
+            if (!student) {
+                throw new Error(`Student with id ${id} not found`);
+            }
+
+            const studentPayload = this.pickStudentPayload(data, true);
+            await student.update(studentPayload, { transaction });
+
+            if (Array.isArray(data.parents)) {
+                await this.syncParents(student.id, data.parents, transaction);
+            }
+
+            await transaction.commit();
+            return await this.findById(student.id);
+        } catch (error) {
+            await transaction.rollback();
+            throw error;
+        }
     }
 
     async delete(id) {

@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const studentController = require('./student.controller');
 const studentCharacterController = require('./student_character.controller');
+const studentMutationController = require('../student-mutations/student_mutation.controller');
 const { authMiddleware } = require('../../core/middleware/auth.middleware');
 const { permissionMiddleware } = require('../../core/middleware/permission.middleware');
 
@@ -15,6 +16,7 @@ router.post('/import', authMiddleware, permissionMiddleware('student.import'), u
 
 router.get('/:id/character-report', authMiddleware, permissionMiddleware('character_report.view'), studentCharacterController.getCharacterReport);
 router.get('/:id/character-report/pdf', authMiddleware, permissionMiddleware('character_report.view'), studentCharacterController.exportCharacterReportPdf);
+router.get('/:id/mutations', authMiddleware, permissionMiddleware('student.mutation.view'), studentMutationController.findByStudentId);
 
 router.get('/', authMiddleware, permissionMiddleware('student.view'), studentController.findAll);
 router.get('/:id', authMiddleware, permissionMiddleware('student.view'), studentController.findById);

@@ -5,6 +5,7 @@ module.exports = (sequelize, DataTypes) => {
     class ParentProfile extends Model {
         static associate(models) {
             ParentProfile.belongsTo(models.Student, { foreignKey: 'student_id', as: 'student' });
+            ParentProfile.hasMany(models.ParentDocument, { foreignKey: 'parent_id', as: 'documents' });
         }
     }
     ParentProfile.init({

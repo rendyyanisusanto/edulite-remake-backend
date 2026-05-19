@@ -1,5 +1,11 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 2 * 1024 * 1024 } // 2 MB
+});
 
 const academicYearController = require('./academic_year.controller');
 const gradeController = require('./grade.controller');
@@ -34,7 +40,7 @@ router.put('/departments/:id', authMiddleware, permissionMiddleware('department.
 router.delete('/departments/:id', authMiddleware, permissionMiddleware('department.delete'), departmentController.delete);
 
 // Classes
-router.get('/classes', authMiddleware, permissionMiddleware('class.view'), classController.findAll);
+router.get('/classes', authMiddleware, classController.findAll);
 router.get('/classes/:id', authMiddleware, permissionMiddleware('class.view'), classController.findById);
 router.post('/classes', authMiddleware, permissionMiddleware('class.create'), classController.create);
 router.put('/classes/:id', authMiddleware, permissionMiddleware('class.update'), classController.update);
@@ -45,6 +51,7 @@ router.get('/teachers', authMiddleware, permissionMiddleware('teacher.view'), te
 router.get('/teachers/:id', authMiddleware, permissionMiddleware('teacher.view'), teacherController.findById);
 router.post('/teachers', authMiddleware, permissionMiddleware('teacher.create'), teacherController.create);
 router.put('/teachers/:id', authMiddleware, permissionMiddleware('teacher.update'), teacherController.update);
+router.post('/teachers/:id/photo', authMiddleware, permissionMiddleware('teacher.update'), upload.single('photo'), teacherController.uploadPhoto);
 router.delete('/teachers/:id', authMiddleware, permissionMiddleware('teacher.delete'), teacherController.delete);
 
 module.exports = router;

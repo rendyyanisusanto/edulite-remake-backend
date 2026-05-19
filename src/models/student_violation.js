@@ -17,7 +17,7 @@ module.exports = (sequelize, DataTypes) => {
         },
         type_id: {
             type: DataTypes.INTEGER,
-            allowNull: false
+            allowNull: true
         },
         date: {
             type: DataTypes.DATEONLY
@@ -29,6 +29,9 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.TEXT
         },
         evidence_file: {
+            type: DataTypes.STRING(255)
+        },
+        photo: {
             type: DataTypes.STRING(255)
         },
         status: {
