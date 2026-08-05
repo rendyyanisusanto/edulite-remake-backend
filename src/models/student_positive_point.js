@@ -12,6 +12,11 @@ module.exports = (sequelize, DataTypes) => {
         }
     }
     StudentPositivePoint.init({
+        id: {
+            type: DataTypes.INTEGER,
+            primaryKey: true,
+            autoIncrement: true
+        },
         student_id: {
             type: DataTypes.INTEGER,
             allowNull: false

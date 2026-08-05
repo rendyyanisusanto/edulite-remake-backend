@@ -1,4 +1,4 @@
-const { StudentViolation, Student, ViolationType, ViolationLevel, User } = require('../../models');
+const { StudentViolation, Student, ViolationType, ViolationLevel, User, AcademicYear } = require('../../models');
 const { Op } = require('sequelize');
 
 class StudentViolationService {
@@ -16,13 +16,18 @@ class StudentViolationService {
                 { description: { [Op.like]: `%${search}%` } }
             ];
         }
+        
+        if (query.academic_year_id) {
+            where.academic_year_id = query.academic_year_id;
+        }
 
         const { count, rows } = await StudentViolation.findAndCountAll({
             where,
             include: [
                 { model: Student, as: 'student', attributes: ['id', 'full_name', 'nis'] },
                 { model: ViolationType, as: 'type', attributes: ['id', 'name', 'point'], include: [{ model: ViolationLevel, as: 'level', attributes: ['id', 'name'] }] },
-                { model: User, as: 'creator', attributes: ['id', 'name'] }
+                { model: User, as: 'creator', attributes: ['id', 'name'] },
+                { model: AcademicYear, as: 'academic_year', attributes: ['id', 'name'] }
             ],
             limit,
             offset,
@@ -38,7 +43,8 @@ class StudentViolationService {
                 { model: Student, as: 'student' },
                 { model: ViolationType, as: 'type', include: [{ model: ViolationLevel, as: 'level' }] },
                 { model: User, as: 'creator', attributes: ['id', 'name'] },
-                { model: User, as: 'approver', attributes: ['id', 'name'] }
+                { model: User, as: 'approver', attributes: ['id', 'name'] },
+                { model: AcademicYear, as: 'academic_year', attributes: ['id', 'name'] }
             ]
         });
         if (!item) throw new Error('Student Violation not found');
@@ -46,6 +52,12 @@ class StudentViolationService {
     }
 
     async create(data) {
+        if (!data.academic_year_id) {
+            const activeYear = await AcademicYear.findOne({ where: { is_active: true } });
+            if (activeYear) {
+                data.academic_year_id = activeYear.id;
+            }
+        }
         return await StudentViolation.create(data);
     }
 

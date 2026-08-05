@@ -93,19 +93,24 @@ class UserService {
         const { name, username, email, password, is_active = true } = data;
 
         if (!name) throw Object.assign(new Error('Name is required'), { statusCode: 400 });
-        if (!email) throw Object.assign(new Error('Email is required'), { statusCode: 400 });
+        if (!username) throw Object.assign(new Error('Username is required'), { statusCode: 400 });
         if (!password) throw Object.assign(new Error('Password is required'), { statusCode: 400 });
         if (password.length < 6) throw Object.assign(new Error('Password must be at least 6 characters'), { statusCode: 400 });
 
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) throw Object.assign(new Error('Invalid email format'), { statusCode: 400 });
+        const normalizedEmail = email ? String(email).trim().toLowerCase() : null;
 
-        const existing = await User.findOne({ where: { email } });
-        if (existing) throw Object.assign(new Error('Email already exists'), { statusCode: 409 });
+        if (normalizedEmail) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(normalizedEmail)) throw Object.assign(new Error('Invalid email format'), { statusCode: 400 });
 
-        const uniqueUsername = await this._generateUniqueUsername(username || email.split('@')[0]);
+            const existing = await User.findOne({ where: { email: normalizedEmail } });
+            if (existing) throw Object.assign(new Error('Email already exists'), { statusCode: 409 });
+        }
+
+        const uniqueUsername = await this._generateUniqueUsername(username);
+        const resolvedEmail = normalizedEmail || `${uniqueUsername}@edulite.local`;
         const password_hash = await bcrypt.hash(password, 10);
-        const user = await User.create({ name, username: uniqueUsername, email, password_hash, is_active });
+        const user = await User.create({ name, username: uniqueUsername, email: resolvedEmail, password_hash, is_active });
 
         return await this.findById(user.id);
     }
@@ -121,18 +126,23 @@ class UserService {
             resolvedUsername = await this._generateUniqueUsername(username, id);
         }
 
-        if (email && email !== user.email) {
+        if (email !== undefined) {
+            const normalizedEmail = email ? String(email).trim().toLowerCase() : null;
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(email)) throw Object.assign(new Error('Invalid email format'), { statusCode: 400 });
+            if (normalizedEmail && !emailRegex.test(normalizedEmail)) throw Object.assign(new Error('Invalid email format'), { statusCode: 400 });
 
-            const existing = await User.findOne({ where: { email, id: { [Op.ne]: id } } });
-            if (existing) throw Object.assign(new Error('Email already exists'), { statusCode: 409 });
+            if (normalizedEmail !== user.email) {
+                const existing = await User.findOne({ where: { email: normalizedEmail, id: { [Op.ne]: id } } });
+                if (existing) throw Object.assign(new Error('Email already exists'), { statusCode: 409 });
+            }
+
+            data.email = normalizedEmail;
         }
 
         await user.update({
             name: name !== undefined ? name : user.name,
             username: resolvedUsername,
-            email: email !== undefined ? email : user.email,
+            email: email !== undefined ? data.email : user.email,
             is_active: is_active !== undefined ? is_active : user.is_active
         });
 

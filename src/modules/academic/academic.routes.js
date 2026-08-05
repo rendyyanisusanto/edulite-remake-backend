@@ -12,6 +12,8 @@ const gradeController = require('./grade.controller');
 const departmentController = require('./department.controller');
 const classController = require('./class.controller');
 const teacherController = require('./teacher.controller');
+const subjectController = require('./subject.controller');
+const lessonPeriodController = require('./lesson_period.controller');
 
 const { authMiddleware } = require('../../core/middleware/auth.middleware');
 const { permissionMiddleware } = require('../../core/middleware/permission.middleware');
@@ -53,5 +55,28 @@ router.post('/teachers', authMiddleware, permissionMiddleware('teacher.create'),
 router.put('/teachers/:id', authMiddleware, permissionMiddleware('teacher.update'), teacherController.update);
 router.post('/teachers/:id/photo', authMiddleware, permissionMiddleware('teacher.update'), upload.single('photo'), teacherController.uploadPhoto);
 router.delete('/teachers/:id', authMiddleware, permissionMiddleware('teacher.delete'), teacherController.delete);
+
+// Subjects
+router.get('/subjects', authMiddleware, permissionMiddleware('subject.view'), subjectController.findAll);
+router.get('/subjects/:id', authMiddleware, permissionMiddleware('subject.view'), subjectController.findById);
+router.post('/subjects', authMiddleware, permissionMiddleware('subject.create'), subjectController.create);
+router.put('/subjects/:id', authMiddleware, permissionMiddleware('subject.update'), subjectController.update);
+router.patch('/subjects/:id/toggle', authMiddleware, permissionMiddleware('subject.toggle_active'), subjectController.toggleActive);
+router.delete('/subjects/:id', authMiddleware, permissionMiddleware('subject.delete'), subjectController.delete);
+
+// Lesson Period Templates
+router.get('/lesson-period-templates', authMiddleware, permissionMiddleware('lesson_period_template.view'), lessonPeriodController.listTemplates);
+router.get('/lesson-period-templates/:id', authMiddleware, permissionMiddleware('lesson_period_template.view'), lessonPeriodController.findTemplateById);
+router.post('/lesson-period-templates', authMiddleware, permissionMiddleware('lesson_period_template.create'), lessonPeriodController.createTemplate);
+router.put('/lesson-period-templates/:id', authMiddleware, permissionMiddleware('lesson_period_template.update'), lessonPeriodController.updateTemplate);
+router.patch('/lesson-period-templates/:id/default', authMiddleware, permissionMiddleware('lesson_period_template.update'), lessonPeriodController.setTemplateDefault);
+router.patch('/lesson-period-templates/:id/toggle', authMiddleware, permissionMiddleware('lesson_period_template.toggle_active'), lessonPeriodController.toggleTemplateActive);
+
+// Lesson Period Details
+router.get('/lesson-period-templates/:templateId/periods', authMiddleware, permissionMiddleware('lesson_period.view'), lessonPeriodController.listPeriodsByTemplate);
+router.post('/lesson-periods', authMiddleware, permissionMiddleware('lesson_period.create'), lessonPeriodController.createPeriod);
+router.put('/lesson-periods/:id', authMiddleware, permissionMiddleware('lesson_period.update'), lessonPeriodController.updatePeriod);
+router.patch('/lesson-periods/:id/toggle', authMiddleware, permissionMiddleware('lesson_period.toggle_active'), lessonPeriodController.togglePeriodActive);
+router.delete('/lesson-periods/:id', authMiddleware, permissionMiddleware('lesson_period.delete'), lessonPeriodController.deletePeriod);
 
 module.exports = router;

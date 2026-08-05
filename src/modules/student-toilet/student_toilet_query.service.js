@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 const { Op, fn, col, literal } = require('sequelize');
 const db = require('../../models');
@@ -113,9 +113,19 @@ class StudentToiletQueryService {
     }
 
     async getTodayScanLogs(limit = 50) {
-        const today = toDateOnly(new Date());
+        const todayStr = toDateOnly(new Date());
+        
+        const startOfDay = new Date(`${todayStr}T00:00:00`);
+        const endOfDay = new Date(`${todayStr}T23:59:59`);
+
         return StudentToiletScanLog.findAll({
-            where: literal(`DATE(scanned_at) = '${today}'`),
+            where: {
+                scanned_at: {
+                    [Op.gte]: startOfDay,
+                    [Op.lte]: endOfDay
+                },
+                result_status: 'SUCCESS'
+            },
             include: [{ model: Student, as: 'student', attributes: ['id', 'full_name', 'nis'], required: false }],
             order: [['id', 'DESC']],
             limit

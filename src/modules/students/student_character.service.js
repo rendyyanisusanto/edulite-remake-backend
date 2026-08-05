@@ -61,9 +61,17 @@ class StudentCharacterService {
 
         const totalAchievementPoints = achievements.reduce((sum, item) => sum + item.points, 0);
 
+        const { AcademicYear } = require('../../models');
+        const activeYear = await AcademicYear.findOne({ where: { is_active: true } });
+        const yearStr = activeYear ? activeYear.name : '2023/2024';
+        const activeYearId = activeYear ? activeYear.id : null;
+
         // Fetch Positive Notes
+        const positiveWhere = { student_id: studentId, status: 'APPROVED' };
+        if (activeYearId) positiveWhere.academic_year_id = activeYearId;
+
         const positivePointsData = await StudentPositivePoint.findAll({
-            where: { student_id: studentId, status: 'APPROVED' },
+            where: positiveWhere,
             include: [
                 {
                     model: PositivePointType,
@@ -88,8 +96,11 @@ class StudentCharacterService {
         const totalPositivePoints = positiveNotes.reduce((sum, item) => sum + item.points, 0);
 
         // Fetch Violations (Only approved)
+        const violationWhere = { student_id: studentId, status: 'APPROVED' };
+        if (activeYearId) violationWhere.academic_year_id = activeYearId;
+
         const violationsData = await StudentViolation.findAll({
-            where: { student_id: studentId, status: 'APPROVED' },
+            where: violationWhere,
             include: [
                 {
                     model: ViolationType,
@@ -124,9 +135,6 @@ class StudentCharacterService {
             final_score: totalAchievementPoints + totalPositivePoints - totalViolationPoints
         };
 
-        const { AcademicYear } = require('../../models');
-        const activeYear = await AcademicYear.findOne({ where: { is_active: true } });
-        const yearStr = activeYear ? activeYear.name : '2023/2024';
 
         return {
             student: {

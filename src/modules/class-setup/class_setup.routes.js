@@ -9,6 +9,10 @@ router.use(authMiddleware);
 router.get('/summary', permissionMiddleware('class_assignment.view'), classSetupController.getSummary);
 router.get('/classes', permissionMiddleware('class_assignment.view'), classSetupController.getClasses);
 router.get('/unassigned-students', permissionMiddleware('class_assignment.view'), classSetupController.getUnassignedStudents);
+router.get('/rombel/summary', permissionMiddleware('class_assignment.view'), classSetupController.getRombelSummary);
+router.get('/rombel', permissionMiddleware('class_assignment.view'), classSetupController.getRombels);
+router.get('/rombel/:class_id', permissionMiddleware('class_assignment.view'), classSetupController.getRombelDetail);
+router.get('/rombel/:class_id/students', permissionMiddleware('class_assignment.view'), classSetupController.getRombelStudents);
 
 router.post('/assign', permissionMiddleware('class_assignment.bulk_assign'), classSetupController.bulkAssign);
 router.post('/move', permissionMiddleware('class_assignment.bulk_move'), classSetupController.bulkMove);

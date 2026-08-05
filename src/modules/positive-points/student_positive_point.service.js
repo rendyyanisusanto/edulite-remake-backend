@@ -16,6 +16,10 @@ class StudentPositivePointService {
             ];
         }
 
+        if (query.academic_year_id) {
+            where.academic_year_id = query.academic_year_id;
+        }
+
         const { count, rows } = await StudentPositivePoint.findAndCountAll({
             where,
             include: [
@@ -47,6 +51,12 @@ class StudentPositivePointService {
     }
 
     async create(data) {
+        if (!data.academic_year_id) {
+            const activeYear = await AcademicYear.findOne({ where: { is_active: true } });
+            if (activeYear) {
+                data.academic_year_id = activeYear.id;
+            }
+        }
         return await StudentPositivePoint.create(data);
     }
 

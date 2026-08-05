@@ -55,9 +55,15 @@ const studentItemDepositRoutes = require('../modules/student-item-deposits/stude
 const studentItemReportRoutes = require('../modules/student-item-deposits/student_item_report.routes');
 const studentItemReceiptRoutes = require('../modules/student-item-deposits/student_item_receipt.routes');
 
+// Public Module
+const publicRoutes = require('../modules/public/public.routes');
+
 router.get('/ping', (req, res) => {
     res.json({ message: 'pong', timestamp: new Date() });
 });
+
+// Public
+router.use('/public', publicRoutes);
 
 // Auth
 router.use('/auth', authRoutes);
@@ -119,4 +125,3 @@ router.use('/', studentItemReportRoutes);
 router.use('/', studentItemReceiptRoutes);
 
 module.exports = router;
-

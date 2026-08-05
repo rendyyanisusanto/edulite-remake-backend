@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 const { Op } = require('sequelize');
 const db = require('../../models');
@@ -113,20 +113,6 @@ class StudentAttendanceScanService {
             });
 
             if (!student || student.rfid_is_active === false) {
-                await this.writeLog(
-                    {
-                        student_id: student ? student.id : null,
-                        attendance_id: null,
-                        shift_id: null,
-                        scanned_rfid_code: scannedRfidCode,
-                        scanned_at: scannedAt,
-                        scan_type: 'AUTO',
-                        result_status: 'UNKNOWN_CARD',
-                        result_message: 'Kartu RFID tidak dikenal'
-                    },
-                    transaction
-                );
-
                 return this.buildFailResponse('Kartu RFID tidak dikenal', 'UNKNOWN_CARD', 404);
             }
 
@@ -139,20 +125,6 @@ class StudentAttendanceScanService {
 
             const shift = await this.resolveShift(student.id, classId, activeAcademicYear.id, attendanceDate, transaction);
             if (!shift) {
-                await this.writeLog(
-                    {
-                        student_id: student.id,
-                        attendance_id: null,
-                        shift_id: null,
-                        scanned_rfid_code: scannedRfidCode,
-                        scanned_at: scannedAt,
-                        scan_type: 'AUTO',
-                        result_status: 'NO_SHIFT',
-                        result_message: 'Shift siswa tidak ditemukan'
-                    },
-                    transaction
-                );
-
                 return this.buildFailResponse('Shift siswa tidak ditemukan', 'NO_SHIFT', 422);
             }
 
@@ -218,54 +190,15 @@ class StudentAttendanceScanService {
 
             if (attendance.clock_in_at && !attendance.clock_out_at) {
                 if (!shift.allow_checkout) {
-                    await this.writeLog(
-                        {
-                            student_id: student.id,
-                            attendance_id: attendance.id,
-                            shift_id: shift.id,
-                            scanned_rfid_code: scannedRfidCode,
-                            scanned_at: scannedAt,
-                            scan_type: 'OUT',
-                            result_status: 'REJECTED',
-                            result_message: 'Shift tidak mengizinkan presensi pulang'
-                        },
-                        transaction
-                    );
                     return this.buildFailResponse('Shift tidak mengizinkan presensi pulang', 'REJECTED', 422);
                 }
 
                 if (!shift.clock_out_start) {
-                    await this.writeLog(
-                        {
-                            student_id: student.id,
-                            attendance_id: attendance.id,
-                            shift_id: shift.id,
-                            scanned_rfid_code: scannedRfidCode,
-                            scanned_at: scannedAt,
-                            scan_type: 'OUT',
-                            result_status: 'REJECTED',
-                            result_message: 'Jam pulang belum diatur pada shift'
-                        },
-                        transaction
-                    );
                     return this.buildFailResponse('Jam pulang belum diatur pada shift', 'REJECTED', 422);
                 }
 
                 const earliestOut = combineDateAndTime(scannedAt, shift.clock_out_start);
                 if (earliestOut && scannedAt.getTime() < earliestOut.getTime()) {
-                    await this.writeLog(
-                        {
-                            student_id: student.id,
-                            attendance_id: attendance.id,
-                            shift_id: shift.id,
-                            scanned_rfid_code: scannedRfidCode,
-                            scanned_at: scannedAt,
-                            scan_type: 'OUT',
-                            result_status: 'REJECTED',
-                            result_message: 'Belum waktunya pulang'
-                        },
-                        transaction
-                    );
                     return this.buildFailResponse('Belum waktunya pulang', 'REJECTED', 422);
                 }
 
@@ -306,20 +239,6 @@ class StudentAttendanceScanService {
                     }
                 });
             }
-
-            await this.writeLog(
-                {
-                    student_id: student.id,
-                    attendance_id: attendance.id,
-                    shift_id: shift.id,
-                    scanned_rfid_code: scannedRfidCode,
-                    scanned_at: scannedAt,
-                    scan_type: 'AUTO',
-                    result_status: 'DUPLICATE',
-                    result_message: 'Scan duplikat pada hari yang sama'
-                },
-                transaction
-            );
 
             return this.buildFailResponse('Scan duplikat pada hari yang sama', 'DUPLICATE', 409);
         });

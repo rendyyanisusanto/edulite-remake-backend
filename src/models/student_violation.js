@@ -8,14 +8,24 @@ module.exports = (sequelize, DataTypes) => {
             StudentViolation.belongsTo(models.ViolationType, { foreignKey: 'type_id', as: 'type' });
             StudentViolation.belongsTo(models.User, { foreignKey: 'created_by', as: 'creator' });
             StudentViolation.belongsTo(models.User, { foreignKey: 'approved_by', as: 'approver' });
+            StudentViolation.belongsTo(models.AcademicYear, { foreignKey: 'academic_year_id', as: 'academic_year' });
         }
     }
     StudentViolation.init({
+        id: {
+            type: DataTypes.INTEGER,
+            primaryKey: true,
+            autoIncrement: true
+        },
         student_id: {
             type: DataTypes.INTEGER,
             allowNull: false
         },
         type_id: {
+            type: DataTypes.INTEGER,
+            allowNull: true
+        },
+        academic_year_id: {
             type: DataTypes.INTEGER,
             allowNull: true
         },

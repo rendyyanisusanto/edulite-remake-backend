@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 const db = require('../../models');
 const {
@@ -43,18 +43,6 @@ class StudentToiletScanService {
             });
 
             if (!student || student.rfid_is_active === false) {
-                await this.writeLog(
-                    {
-                        student_id: student ? student.id : null,
-                        toilet_permission_id: null,
-                        scanned_rfid_code: scannedRfidCode,
-                        scanned_at: scannedAt,
-                        scan_type: 'AUTO',
-                        result_status: 'UNKNOWN_CARD',
-                        result_message: 'Kartu RFID tidak dikenal'
-                    },
-                    transaction
-                );
                 return this.buildFailResponse('Kartu RFID tidak dikenal', 'UNKNOWN_CARD', 404);
             }
 
@@ -176,19 +164,6 @@ class StudentToiletScanService {
                     }
                 });
             }
-
-            await this.writeLog(
-                {
-                    student_id: student.id,
-                    toilet_permission_id: activeTrip.id,
-                    scanned_rfid_code: scannedRfidCode,
-                    scanned_at: scannedAt,
-                    scan_type: 'AUTO',
-                    result_status: 'REJECTED',
-                    result_message: 'Kondisi scan toilet tidak valid'
-                },
-                transaction
-            );
 
             return this.buildFailResponse('Kondisi scan toilet tidak valid', 'REJECTED', 422);
         });
