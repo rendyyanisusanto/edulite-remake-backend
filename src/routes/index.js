@@ -18,6 +18,7 @@ const parentRoutes = require('../modules/students/parent.routes');
 const documentRoutes = require('../modules/students/document.routes');
 const studentClassHistoryRoutes = require('../modules/students/student_class_history.routes');
 const classSetupRoutes = require('../modules/class-setup/class_setup.routes');
+const classReportRoutes = require('../modules/class-reports/class_report.routes');
 const studentMutationRoutes = require('../modules/student-mutations/student_mutation.routes');
 
 // Academic
@@ -78,6 +79,7 @@ router.use('/menus', menuRoutes);
 router.use('/students', studentRoutes);
 router.use('/class-histories', studentClassHistoryRoutes);
 router.use('/class-setup', classSetupRoutes);
+router.use('/class-reports', classReportRoutes);
 router.use('/parents', parentRoutes);
 router.use('/documents', documentRoutes);
 router.use('/student-mutations', studentMutationRoutes);
