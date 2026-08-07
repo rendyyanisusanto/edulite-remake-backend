@@ -433,7 +433,6 @@ class ClassSetupService {
                 {
                     where: {
                         student_id: { [Op.in]: student_ids },
-                        class_id: from_class_id,
                         academic_year_id
                     },
                     transaction
