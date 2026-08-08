@@ -4,10 +4,32 @@ const express = require('express');
 const router = express.Router();
 
 const { authMiddleware } = require('../../core/middleware/auth.middleware');
+const multer = require('multer');
 
 const scanController = require('./student_attendance_scan.controller');
 const shiftController = require('./student_attendance_shift.controller');
 const correctionController = require('./student_attendance_correction.controller');
+const attendanceController = require('./student_attendance.controller');
+
+// Configure multer for file upload
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB
+    },
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = [
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel',
+            'text/csv'
+        ];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid file type. Only Excel and CSV files are allowed.'));
+        }
+    }
+});
 
 // Public kiosk endpoint (no auth)
 router.post('/student-attendances/rfid-scan', scanController.rfidScan);
@@ -44,6 +66,43 @@ router.get('/student-attendance-corrections/:id', authMiddleware, correctionCont
 router.post('/student-attendance-corrections', authMiddleware, correctionController.create);
 router.put('/student-attendance-corrections/:id', authMiddleware, correctionController.update);
 router.patch('/student-attendance-corrections/:id/review', authMiddleware, correctionController.review);
+
+// ============================================
+// Student Attendance CRUD (NEW)
+// ============================================
+
+// List with filters and pagination
+router.get('/v1/student-attendances', authMiddleware, attendanceController.getList);
+
+// Get summary statistics
+router.get('/v1/student-attendances/summary', authMiddleware, attendanceController.getSummary);
+
+// Get by ID
+router.get('/v1/student-attendances/:id', authMiddleware, attendanceController.getById);
+
+// Upsert single attendance
+router.post('/v1/student-attendances/upsert', authMiddleware, attendanceController.upsert);
+
+// Bulk upsert for class
+router.post('/v1/student-attendances/bulk-upsert', authMiddleware, attendanceController.bulkUpsert);
+
+// Get students by class for input form
+router.get('/v1/academic/classes/:classId/students', authMiddleware, attendanceController.getStudentsByClass);
+
+// Update attendance
+router.put('/v1/student-attendances/:id', authMiddleware, attendanceController.update);
+
+// Delete attendance
+router.delete('/v1/student-attendances/:id', authMiddleware, attendanceController.delete);
+
+// Validate import file
+router.post('/v1/student-attendances/import/validate', authMiddleware, upload.single('file'), attendanceController.validateImport);
+
+// Import from file
+router.post('/v1/student-attendances/import', authMiddleware, upload.single('file'), attendanceController.importAttendance);
+
+// Download template
+router.get('/v1/student-attendances/template', authMiddleware, attendanceController.downloadTemplate);
 
 module.exports = router;
 

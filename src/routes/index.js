@@ -45,6 +45,8 @@ const mobileRoutes = require('../modules/mobile/mobile.routes');
 const attendanceRoutes = require('../modules/attendance/attendance.routes');
 const studentAttendanceRoutes = require('../modules/student-attendance/student_attendance.routes');
 const studentToiletRoutes = require('../modules/student-toilet/student_toilet.routes');
+const tahfidzAttendanceRoutes = require('../modules/tahfidz-attendance/tahfidz_attendance.routes');
+
 const extracurricularRoutes = require('../modules/extracurricular/extracurricular.routes');
 const extracurricularReportRoutes = require('../modules/extracurricular/report.routes');
 const myExtracurricularRoutes = require('../modules/extracurricular/my_extracurricular.routes');
@@ -114,6 +116,8 @@ router.use('/mobile', mobileRoutes);
 router.use('/attendance', attendanceRoutes);
 router.use('/', studentAttendanceRoutes);
 router.use('/', studentToiletRoutes);
+router.use('/', tahfidzAttendanceRoutes);
+
 router.use('/extracurricular/reports', extracurricularReportRoutes);
 router.use('/extracurricular', extracurricularRoutes);
 router.use('/my/extracurricular', myExtracurricularRoutes);

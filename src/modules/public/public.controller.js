@@ -3,12 +3,12 @@ const publicService = require('./public.service');
 exports.getStudentDashboard = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { date } = req.query;
+        const { date, filter } = req.query;
         
         // If date is not provided, use today's date in local timezone
         const targetDate = date || new Date().toLocaleString('sv', { timeZone: 'Asia/Jakarta' }).split(' ')[0];
 
-        const data = await publicService.getStudentDashboard(id, targetDate);
+        const data = await publicService.getStudentDashboard(id, targetDate, filter);
         
         if (!data) {
             return res.status(404).json({

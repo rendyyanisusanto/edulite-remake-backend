@@ -9,11 +9,12 @@ const {
     PermissionLetterStudent,
     PermissionLetter,
     StudentPositivePoint,
-    PositivePointType
+    PositivePointType,
+    StudentTahfidzAttendance
 } = require('../../models');
 const { Op } = require('sequelize');
 
-exports.getStudentDashboard = async (studentId, date) => {
+exports.getStudentDashboard = async (studentId, date, filter) => {
     // 1. Fetch Student
     const student = await Student.findOne({
         where: { id: studentId }
@@ -29,8 +30,21 @@ exports.getStudentDashboard = async (studentId, date) => {
     });
 
     // 2. Fetch Data
-    const attendance = await StudentDailyAttendance.findOne({
-        where: { student_id: studentId, attendance_date: date }
+    const endDate = new Date(date);
+    const startDate = new Date(date);
+    
+    if (filter === 'last7days') {
+        startDate.setDate(startDate.getDate() - 6); // 7 days inclusive
+    }
+
+    const tahfidzAttendances = await StudentTahfidzAttendance.findAll({
+        where: { 
+            student_id: studentId, 
+            attendance_date: {
+                [Op.between]: [startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]
+            }
+        },
+        order: [['attendance_date', 'DESC']]
     });
 
     const toiletPermissions = await StudentToiletPermission.findAll({
@@ -68,23 +82,22 @@ exports.getStudentDashboard = async (studentId, date) => {
     // 3. Build Timeline
     const timeline = [];
 
-    if (attendance) {
-        if (attendance.clock_in_at) {
+    if (tahfidzAttendances && tahfidzAttendances.length > 0) {
+        // Find today's (or selected date's) attendance to potentially add to timeline
+        const todayAttendance = tahfidzAttendances.find(a => a.attendance_date === date);
+        if (todayAttendance) {
+            let icon = '✅';
+            let title = 'Hadir Tahfidz';
+            if (todayAttendance.status === 'permission') { icon = '📄'; title = 'Izin Tahfidz'; }
+            if (todayAttendance.status === 'sick') { icon = '🤒'; title = 'Sakit Tahfidz'; }
+            if (todayAttendance.status === 'absent') { icon = '❌'; title = 'Alpa Tahfidz'; }
+            
             timeline.push({
-                time: attendance.clock_in_at,
-                title: 'Datang ke Sekolah',
-                type: 'attendance_in',
-                icon: '✅',
-                details: `Jam Masuk: ${formatTime(attendance.clock_in_at)}`
-            });
-        }
-        if (attendance.clock_out_at) {
-            timeline.push({
-                time: attendance.clock_out_at,
-                title: 'Pulang Sekolah',
-                type: 'attendance_out',
-                icon: '👋',
-                details: `Jam Pulang: ${formatTime(attendance.clock_out_at)}`
+                time: todayAttendance.created_at || todayAttendance.updated_at || `${date}T07:00:00Z`,
+                title: title,
+                type: 'tahfidz_attendance',
+                icon: icon,
+                details: todayAttendance.notes || 'Absensi kegiatan Tahfidz.'
             });
         }
     }
@@ -148,9 +161,8 @@ exports.getStudentDashboard = async (studentId, date) => {
         item.formatted_time = formatTime(item.time);
     });
 
-    // 4. Build Summary
     const summary = {
-        attendance: attendance ? (attendance.clock_out_at ? 'Sudah Pulang' : (attendance.clock_in_at ? 'Sedang di Sekolah' : 'Belum Hadir')) : 'Belum Hadir',
+        attendance: tahfidzAttendances.length > 0 ? 'Terekap' : 'Belum Ada',
         toilet_count: toiletPermissions.length,
         violation_count: violations.length,
         permission_count: permissions.length,
@@ -167,12 +179,11 @@ exports.getStudentDashboard = async (studentId, date) => {
             class_name: classHistory && classHistory.class_info ? classHistory.class_info.name : '-'
         },
         summary,
-        attendance: attendance ? {
-            status: attendance.attendance_status,
-            clock_in: formatTime(attendance.clock_in_at),
-            clock_out: formatTime(attendance.clock_out_at),
-            late_minutes: attendance.late_minutes
-        } : null,
+        tahfidz_attendances: tahfidzAttendances.map(a => ({
+            date: a.attendance_date,
+            status: a.status,
+            notes: a.notes
+        })),
         toilet_permissions: toiletPermissions.map(tp => ({
             exit_at: formatTime(tp.exit_at),
             return_at: formatTime(tp.return_at),
