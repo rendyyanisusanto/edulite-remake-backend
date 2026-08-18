@@ -29,9 +29,20 @@ class ClassReportService {
       });
     }
 
+    const QRCode = require('qrcode');
+    const students = await Promise.all((studentsData.students || []).map(async (student) => {
+      const parentLink = `http://localhost:5173/parent/${student.id}`;
+      const qrCode = await QRCode.toDataURL(parentLink);
+      return {
+        ...student,
+        parentLink,
+        qrCode
+      };
+    }));
+
     return {
       class_info: classDetail,
-      students: studentsData.students || [],
+      students: students,
       total_students: studentsData.totalItems || 0,
       school_profile: schoolProfile || {},
       homeroom_teacher: homeroomTeacher,

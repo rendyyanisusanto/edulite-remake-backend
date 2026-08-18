@@ -26,6 +26,7 @@
     "mysql2": "^3.19.1",
     "pdfkit": "^0.17.2",
     "puppeteer": "^24.38.0",
+    "qrcode": "^1.5.4",
     "sequelize": "^6.37.8",
     "winston": "^3.19.0"
   },
