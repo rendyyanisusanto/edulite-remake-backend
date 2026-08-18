@@ -30,8 +30,9 @@ class ClassReportService {
     }
 
     const QRCode = require('qrcode');
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const students = await Promise.all((studentsData.students || []).map(async (student) => {
-      const parentLink = `http://localhost:5173/parent/${student.id}`;
+      const parentLink = `${baseUrl}/parent/${student.id}`;
       const qrCode = await QRCode.toDataURL(parentLink);
       return {
         ...student,

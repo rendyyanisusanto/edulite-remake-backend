@@ -88,7 +88,6 @@ module.exports = function classReportLayout({
           <th>NIS</th>
           <th>NISN</th>
           <th>Nama Lengkap</th>
-          <th>L/P</th>
           <th>Akses Orang Tua</th>
         </tr>
       </thead>
@@ -106,13 +105,12 @@ module.exports = function classReportLayout({
             <td>${esc(student.nis || '-')}</td>
             <td>${esc(student.nisn || '-')}</td>
             <td>${esc(student.full_name || '-')}</td>
-            <td class="text-center">${formatGender(student.gender)}</td>
             <td class="text-center">
               ${student.qrCode ? `<img src="${student.qrCode}" alt="QR" style="width:40px;height:40px;margin-bottom:2px;"/><br/>` : ''}
               <a href="${esc(student.parentLink)}" style="font-size:8px;color:#0066cc;text-decoration:none;" target="_blank">Link Wali</a>
             </td>
           </tr>`;
-        }).join('') : '<tr><td colspan="7" class="text-center">Tidak ada data siswa</td></tr>'}
+        }).join('') : '<tr><td colspan="6" class="text-center">Tidak ada data siswa</td></tr>'}
       </tbody>
     </table>
 
