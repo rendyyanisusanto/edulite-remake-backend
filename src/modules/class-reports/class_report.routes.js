@@ -6,7 +6,11 @@ const { permissionMiddleware } = require('../../core/middleware/permission.middl
 
 router.use(authMiddleware);
 
-// All endpoints use class_assignment.view permission since this is a reporting feature
+router.get('/all/pdf-zip',
+  permissionMiddleware('class_assignment.view'),
+  classReportController.printAllPdfZip
+);
+
 router.get('/:classId/data',
   permissionMiddleware('class_assignment.view'),
   classReportController.getClassReportData

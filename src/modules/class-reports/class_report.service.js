@@ -79,6 +79,17 @@ class ClassReportService {
 
     return { type: 'pdf', content: pdf };
   }
+  async generateAllPdfZip(academic_year_id, archive) {
+    const classes = await classSetupService.getRombels(academic_year_id, {});
+    for (const cls of classes) {
+      if (cls.student_count > 0) {
+        const output = await this.renderReport(academic_year_id, cls.id, 'pdf');
+        // sanitize class name for filename
+        const safeName = cls.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        archive.append(Buffer.from(output.content), { name: `laporan-kelas-${safeName}.pdf` });
+      }
+    }
+  }
 }
 
 module.exports = new ClassReportService();

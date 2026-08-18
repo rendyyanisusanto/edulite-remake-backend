@@ -50,3 +50,26 @@ async function renderReport(req, res, next, mode) {
 
 exports.printPreview = (req, res, next) => renderReport(req, res, next, 'preview');
 exports.printPdf = (req, res, next) => renderReport(req, res, next, 'pdf');
+
+exports.printAllPdfZip = async (req, res, next) => {
+  try {
+    const { academic_year_id } = req.query;
+    if (!academic_year_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'academic_year_id wajib diisi',
+        error_code: 'BAD_REQUEST'
+      });
+    }
+
+    const { ZipArchive } = require('archiver');
+    const archive = new ZipArchive({ zlib: { level: 9 } });
+
+    res.attachment(`laporan-semua-kelas-${new Date().toISOString().slice(0, 10)}.zip`);
+    archive.pipe(res);
+
+    await classReportService.generateAllPdfZip(academic_year_id, archive);
+
+    archive.finalize();
+  } catch (e) { next(e); }
+};
