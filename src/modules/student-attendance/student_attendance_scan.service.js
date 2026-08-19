@@ -103,17 +103,32 @@ class StudentAttendanceScanService {
     async scan(payload = {}) {
         const scannedAt = parseScannedAt(payload.scanned_at);
         const attendanceDate = toDateOnly(scannedAt);
-        const scannedRfidCode = this.sanitizeRfid(payload.rfid_code);
+        const scannedRfidCode = payload.rfid_code ? this.sanitizeRfid(payload.rfid_code) : null;
+        const studentId = payload.student_id;
+        const isManual = payload.is_manual === true;
+        const inputMethod = isManual ? 'MANUAL' : 'RFID';
 
         return db.sequelize.transaction(async (transaction) => {
-            const student = await Student.findOne({
-                where: { rfid_code: scannedRfidCode },
-                attributes: ['id', 'full_name', 'rfid_code', 'rfid_is_active'],
-                transaction
-            });
+            let student;
+            if (studentId) {
+                student = await Student.findOne({
+                    where: { id: studentId },
+                    attributes: ['id', 'full_name', 'rfid_code', 'rfid_is_active'],
+                    transaction
+                });
+            } else {
+                student = await Student.findOne({
+                    where: { rfid_code: scannedRfidCode },
+                    attributes: ['id', 'full_name', 'rfid_code', 'rfid_is_active'],
+                    transaction
+                });
+                if (student && student.rfid_is_active === false) {
+                    return this.buildFailResponse('Kartu RFID tidak dikenal', 'UNKNOWN_CARD', 404);
+                }
+            }
 
-            if (!student || student.rfid_is_active === false) {
-                return this.buildFailResponse('Kartu RFID tidak dikenal', 'UNKNOWN_CARD', 404);
+            if (!student) {
+                return this.buildFailResponse(studentId ? 'Siswa tidak ditemukan' : 'Kartu RFID tidak dikenal', 'NOT_FOUND', 404);
             }
 
             const activeAcademicYear = await this.getActiveAcademicYear(transaction);
@@ -149,7 +164,7 @@ class StudentAttendanceScanService {
                         shift_id: shift.id,
                         attendance_date: attendanceDate,
                         clock_in_at: scannedAt,
-                        clock_in_method: 'RFID',
+                        clock_in_method: inputMethod,
                         entry_status: isLate ? 'LATE' : 'ONTIME',
                         attendance_status: isLate ? 'LATE' : 'PRESENT',
                         late_minutes: lateMinutes
@@ -162,7 +177,7 @@ class StudentAttendanceScanService {
                         student_id: student.id,
                         attendance_id: created.id,
                         shift_id: shift.id,
-                        scanned_rfid_code: scannedRfidCode,
+                        scanned_rfid_code: scannedRfidCode || 'MANUAL_KIOSK',
                         scanned_at: scannedAt,
                         scan_type: 'IN',
                         result_status: 'SUCCESS',
@@ -205,7 +220,7 @@ class StudentAttendanceScanService {
                 await attendance.update(
                     {
                         clock_out_at: scannedAt,
-                        clock_out_method: 'RFID',
+                        clock_out_method: inputMethod,
                         exit_status: 'NORMAL'
                     },
                     { transaction }
@@ -216,7 +231,7 @@ class StudentAttendanceScanService {
                         student_id: student.id,
                         attendance_id: attendance.id,
                         shift_id: shift.id,
-                        scanned_rfid_code: scannedRfidCode,
+                        scanned_rfid_code: scannedRfidCode || 'MANUAL_KIOSK',
                         scanned_at: scannedAt,
                         scan_type: 'OUT',
                         result_status: 'SUCCESS',

@@ -33,17 +33,31 @@ class StudentToiletScanService {
     async scan(payload = {}) {
         const scannedAt = parseScannedAt(payload.scanned_at);
         const scannedDate = toDateOnly(scannedAt);
-        const scannedRfidCode = this.sanitizeRfid(payload.rfid_code);
+        const scannedRfidCode = payload.rfid_code ? this.sanitizeRfid(payload.rfid_code) : null;
+        const studentId = payload.student_id;
+        const isManual = payload.is_manual === true;
 
         return db.sequelize.transaction(async (transaction) => {
-            const student = await Student.findOne({
-                where: { rfid_code: scannedRfidCode },
-                attributes: ['id', 'full_name', 'rfid_is_active'],
-                transaction
-            });
+            let student;
+            if (studentId) {
+                student = await Student.findOne({
+                    where: { id: studentId },
+                    attributes: ['id', 'full_name', 'rfid_is_active'],
+                    transaction
+                });
+            } else {
+                student = await Student.findOne({
+                    where: { rfid_code: scannedRfidCode },
+                    attributes: ['id', 'full_name', 'rfid_is_active'],
+                    transaction
+                });
+                if (student && student.rfid_is_active === false) {
+                    return this.buildFailResponse('Kartu RFID tidak dikenal', 'UNKNOWN_CARD', 404);
+                }
+            }
 
-            if (!student || student.rfid_is_active === false) {
-                return this.buildFailResponse('Kartu RFID tidak dikenal', 'UNKNOWN_CARD', 404);
+            if (!student) {
+                return this.buildFailResponse(studentId ? 'Siswa tidak ditemukan' : 'Kartu RFID tidak dikenal', 'NOT_FOUND', 404);
             }
 
             const activeAcademicYear = await AcademicYear.findOne({ where: { is_active: true }, order: [['id', 'DESC']], transaction });
@@ -89,7 +103,7 @@ class StudentToiletScanService {
                     {
                         student_id: student.id,
                         toilet_permission_id: created.id,
-                        scanned_rfid_code: scannedRfidCode,
+                        scanned_rfid_code: scannedRfidCode || 'MANUAL_KIOSK',
                         scanned_at: scannedAt,
                         scan_type: 'OUT',
                         result_status: 'SUCCESS',
@@ -130,7 +144,7 @@ class StudentToiletScanService {
                     {
                         student_id: student.id,
                         toilet_permission_id: activeTrip.id,
-                        scanned_rfid_code: scannedRfidCode,
+                        scanned_rfid_code: scannedRfidCode || 'MANUAL_KIOSK',
                         scanned_at: scannedAt,
                         scan_type: 'RETURN',
                         result_status: 'SUCCESS',
