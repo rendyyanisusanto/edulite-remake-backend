@@ -1,7 +1,7 @@
 'use strict';
 
 const db = require('../../models');
-const { PermissionLetter, PermissionLetterStudent, Teacher, Student, User } = db;
+const { PermissionLetter, PermissionLetterStudent, Teacher, Student, User, AcademicYear } = db;
 const { Op } = require('sequelize');
 
 class PermissionLetterService {
@@ -64,11 +64,16 @@ class PermissionLetterService {
             if (query.date_to) where.start_date[Op.lte] = query.date_to;
         }
 
+        // Only show data from the currently active academic year
+        const activeYear = await AcademicYear.findOne({ where: { is_active: true } });
+        if (activeYear) where.academic_year_id = activeYear.id;
+
         const { count, rows } = await PermissionLetter.findAndCountAll({
             where,
             include: [
                 { model: Teacher, as: 'teacher', attributes: ['id', 'full_name', 'nip'] },
                 { model: User, as: 'creator', attributes: ['id', 'name'] },
+                { model: AcademicYear, as: 'academicYear', attributes: ['id', 'name'] },
                 {
                     model: PermissionLetterStudent,
                     as: 'students',
@@ -97,6 +102,7 @@ class PermissionLetterService {
                 { model: User, as: 'creator', attributes: ['id', 'name'] },
                 { model: User, as: 'updater', attributes: ['id', 'name'] },
                 { model: User, as: 'approver', attributes: ['id', 'name'] },
+                { model: AcademicYear, as: 'academicYear', attributes: ['id', 'name'] },
                 {
                     model: PermissionLetterStudent,
                     as: 'students',
@@ -131,6 +137,12 @@ class PermissionLetterService {
         // Auto-generate code if not provided
         if (!letterData.code) {
             letterData.code = this._generateCode();
+        }
+
+        // Auto-assign active academic year if not provided
+        if (!letterData.academic_year_id) {
+            const activeYear = await AcademicYear.findOne({ where: { is_active: true } });
+            if (activeYear) letterData.academic_year_id = activeYear.id;
         }
 
         // Snapshot companion_name from teacher if not manually set

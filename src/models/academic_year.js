@@ -18,6 +18,7 @@ module.exports = (sequelize, DataTypes) => {
             AcademicYear.hasMany(models.StudentToiletPermission, { foreignKey: 'academic_year_id', as: 'student_toilet_permissions' });
             AcademicYear.hasMany(models.StudentViolation, { foreignKey: 'academic_year_id', as: 'student_violations' });
             AcademicYear.hasMany(models.StudentPositivePoint, { foreignKey: 'academic_year_id', as: 'student_positive_points' });
+            AcademicYear.hasMany(models.PermissionLetter, { foreignKey: 'academic_year_id', as: 'permission_letters' });
         }
     }
     AcademicYear.init({

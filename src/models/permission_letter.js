@@ -8,6 +8,7 @@ module.exports = (sequelize, DataTypes) => {
             PermissionLetter.belongsTo(models.User, { foreignKey: 'created_by', as: 'creator' });
             PermissionLetter.belongsTo(models.User, { foreignKey: 'updated_by', as: 'updater' });
             PermissionLetter.belongsTo(models.User, { foreignKey: 'approved_by', as: 'approver' });
+            PermissionLetter.belongsTo(models.AcademicYear, { foreignKey: 'academic_year_id', as: 'academicYear' });
             PermissionLetter.hasMany(models.PermissionLetterStudent, {
                 foreignKey: 'permission_letter_id',
                 as: 'students'
@@ -53,6 +54,9 @@ module.exports = (sequelize, DataTypes) => {
         },
         notes: {
             type: DataTypes.TEXT
+        },
+        academic_year_id: {
+            type: DataTypes.INTEGER
         },
         created_by: {
             type: DataTypes.INTEGER

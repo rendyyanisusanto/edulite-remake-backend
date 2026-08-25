@@ -53,8 +53,8 @@ exports.create = async (req, res, next) => {
 
 exports.update = async (req, res, next) => {
     try {
-        // Strip teacher_id from body to prevent tampering during updates
-        const { teacher_id, ...safeBody } = req.body;
+        // Strip teacher_id and academic_year_id from body to prevent tampering during updates
+        const { teacher_id, academic_year_id, ...safeBody } = req.body;
         
         const data = {
             ...safeBody,

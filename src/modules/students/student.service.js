@@ -5,6 +5,7 @@ const {
     StudentDocument,
     StudentClassHistory,
     Class,
+    AcademicYear,
     sequelize
 } = require('../../models');
 const { Op } = require('sequelize');
@@ -200,12 +201,19 @@ class StudentService {
             ];
         }
 
+        // Resolve active academic year
+        const activeYear = await AcademicYear.findOne({ where: { is_active: true } });
+        const historyWhere = {};
+        if (activeYear) historyWhere.academic_year_id = activeYear.id;
+        if (classId) historyWhere.class_id = classId;
+
         const include = [
             {
                 model: StudentClassHistory,
                 as: 'class_history',
+                // required only when filtering by class (inner join) or when active year exists (to scope data)
                 required: classId ? true : false,
-                where: classId ? { class_id: classId } : undefined,
+                where: Object.keys(historyWhere).length > 0 ? historyWhere : undefined,
                 include: [
                     { model: Class, as: 'class_info', attributes: ['id', 'name'] }
                 ]

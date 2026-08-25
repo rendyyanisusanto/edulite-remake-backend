@@ -35,7 +35,7 @@ const toiletScanService = require('../student-toilet/student_toilet_scan.service
 const toiletQueryService = require('../student-toilet/student_toilet_query.service');
 
 const validateKioskToken = (req) => {
-    const token = req.query.kiosk_token || req.body.kiosk_token || req.headers['x-kiosk-token'];
+    const token = req.query?.kiosk_token || req.body?.kiosk_token || req.headers?.['x-kiosk-token'];
     const validTokens = [
         process.env.RFID_GATE_KIOSK_TOKEN,
         process.env.RFID_TOILET_KIOSK_TOKEN,
