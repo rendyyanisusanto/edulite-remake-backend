@@ -4,12 +4,40 @@ const { Class } = require('../../models');
 class TahfidzAttendanceController {
     async getClasses(req, res) {
         try {
+            const { date } = req.query;
+
             // Ideally, filter by teacher's classes if it's a teacher role. 
             // For now, returning all active classes.
             const classes = await Class.findAll({
                 order: [['name', 'ASC']],
-                attributes: ['id', 'name']
+                attributes: ['id', 'name'],
+                raw: true
             });
+
+            if (date) {
+                const { StudentTahfidzAttendance } = require('../../models');
+                const { Sequelize } = require('sequelize');
+
+                const attendanceCounts = await StudentTahfidzAttendance.findAll({
+                    where: { attendance_date: date },
+                    attributes: ['class_id', [Sequelize.fn('COUNT', Sequelize.col('id')), 'count']],
+                    group: ['class_id'],
+                    raw: true
+                });
+
+                const countMap = {};
+                attendanceCounts.forEach(item => {
+                    countMap[item.class_id] = parseInt(item.count, 10);
+                });
+
+                const enrichedClasses = classes.map(c => ({
+                    ...c,
+                    is_filled: (countMap[c.id] || 0) > 0
+                }));
+
+                return res.status(200).json({ success: true, data: enrichedClasses });
+            }
+
             res.status(200).json({ success: true, data: classes });
         } catch (error) {
             res.status(500).json({ success: false, message: error.message });
