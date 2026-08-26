@@ -59,8 +59,15 @@ class StudentToiletQueryService {
     }
 
     async getSummary(query = {}) {
-        const targetDate = query.date || toDateOnly(new Date());
-        const where = { permission_date: targetDate };
+        const where = {};
+        if (query.start_date && query.end_date) {
+            where.permission_date = { [Op.between]: [query.start_date, query.end_date] };
+        } else if (query.date) {
+            where.permission_date = query.date;
+        } else {
+            where.permission_date = toDateOnly(new Date());
+        }
+
         if (query.class_id) where.class_id = query.class_id;
 
         const aggregateRows = await StudentToiletPermission.findAll({
@@ -103,12 +110,24 @@ class StudentToiletQueryService {
             order: [['exit_at', 'ASC']]
         });
 
+        const permissionHistory = await StudentToiletPermission.findAll({
+            where,
+            include: [
+                { model: Student, as: 'student', attributes: ['id', 'full_name', 'nis'] },
+                { model: Class, as: 'class_info', attributes: ['id', 'name'], required: false }
+            ],
+            order: [['exit_at', 'DESC']]
+        });
+
         return {
-            date: targetDate,
+            date: query.date || toDateOnly(new Date()),
+            start_date: query.start_date,
+            end_date: query.end_date,
             by_student: byStudent,
             ranking_most_trips: rankingMostTrips,
             ranking_longest_duration: rankingLongestDuration,
-            currently_out: currentlyOut
+            currently_out: currentlyOut,
+            permission_history: permissionHistory
         };
     }
 
