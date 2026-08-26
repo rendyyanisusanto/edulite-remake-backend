@@ -25,44 +25,8 @@ class StudentCharacterService {
     async getCharacterReportData(studentId, academicYearId = null) {
         const student = await this.getStudentIdentity(studentId);
 
-        // Fetch Achievements
-        const achievementResults = await AchievementResult.findAll({
-            include: [
-                {
-                    model: AchievementParticipant,
-                    as: 'participant',
-                    where: { student_id: studentId },
-                    include: [
-                        { model: Achievement, as: 'achievement' }
-                    ]
-                },
-                {
-                    model: AchievementPointRule,
-                    as: 'point_rule'
-                }
-            ],
-            order: [[{ model: AchievementParticipant, as: 'participant' }, { model: Achievement, as: 'achievement' }, 'event_date', 'DESC']]
-        });
-
-        const achievements = achievementResults.map(r => {
-            const ach = r.participant && r.participant.achievement ? r.participant.achievement : {};
-            const rule = r.point_rule;
-            return {
-                id: r.id,
-                date: ach.event_date || '-',
-                title: ach.title || '-',
-                level: ach.level || '-',
-                rank: r.rank || (rule ? rule.rank : '-'),
-                points: parseInt(r.points || 0),
-                organizer: ach.organizer || '-',
-                location: ach.location || '-'
-            };
-        });
-
-        const totalAchievementPoints = achievements.reduce((sum, item) => sum + item.points, 0);
-
+        // Resolve academic year first
         const { AcademicYear } = require('../../models');
-
         let activeYear = null;
         let resolvedYearId = academicYearId;
 
@@ -76,6 +40,51 @@ class StudentCharacterService {
 
         const yearStr = activeYear ? activeYear.name : 'Semua Tahun Ajaran';
         const activeYearId = resolvedYearId;
+
+        // Fetch Achievements (filtered by academic year)
+        const achievementInclude = {
+            model: AchievementParticipant,
+            as: 'participant',
+            where: { student_id: studentId },
+            include: [
+                {
+                    model: Achievement,
+                    as: 'achievement',
+                    ...(activeYearId ? { where: { academic_year_id: activeYearId } } : {})
+                }
+            ]
+        };
+
+        const achievementResults = await AchievementResult.findAll({
+            include: [
+                achievementInclude,
+                {
+                    model: AchievementPointRule,
+                    as: 'point_rule'
+                }
+            ],
+            order: [[{ model: AchievementParticipant, as: 'participant' }, { model: Achievement, as: 'achievement' }, 'event_date', 'DESC']]
+        });
+
+        const achievements = achievementResults
+            .filter(r => r.participant && r.participant.achievement)
+            .map(r => {
+                const ach = r.participant.achievement;
+                const rule = r.point_rule;
+                return {
+                    id: r.id,
+                    date: ach.event_date || '-',
+                    title: ach.title || '-',
+                    level: ach.level || '-',
+                    rank: r.rank || (rule ? rule.rank : '-'),
+                    points: parseInt(r.points || 0),
+                    organizer: ach.organizer || '-',
+                    location: ach.location || '-'
+                };
+            });
+
+        const totalAchievementPoints = achievements.reduce((sum, item) => sum + item.points, 0);
+
 
         // Fetch Positive Notes
         const positiveWhere = { student_id: studentId, status: 'APPROVED' };
