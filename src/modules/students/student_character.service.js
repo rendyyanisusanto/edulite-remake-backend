@@ -22,7 +22,7 @@ class StudentCharacterService {
         return student;
     }
 
-    async getCharacterReportData(studentId) {
+    async getCharacterReportData(studentId, academicYearId = null) {
         const student = await this.getStudentIdentity(studentId);
 
         // Fetch Achievements
@@ -62,9 +62,20 @@ class StudentCharacterService {
         const totalAchievementPoints = achievements.reduce((sum, item) => sum + item.points, 0);
 
         const { AcademicYear } = require('../../models');
-        const activeYear = await AcademicYear.findOne({ where: { is_active: true } });
-        const yearStr = activeYear ? activeYear.name : '2023/2024';
-        const activeYearId = activeYear ? activeYear.id : null;
+
+        let activeYear = null;
+        let resolvedYearId = academicYearId;
+
+        if (resolvedYearId) {
+            activeYear = await AcademicYear.findByPk(resolvedYearId);
+        }
+        if (!activeYear) {
+            activeYear = await AcademicYear.findOne({ where: { is_active: true } });
+            if (!resolvedYearId) resolvedYearId = activeYear ? activeYear.id : null;
+        }
+
+        const yearStr = activeYear ? activeYear.name : 'Semua Tahun Ajaran';
+        const activeYearId = resolvedYearId;
 
         // Fetch Positive Notes
         const positiveWhere = { student_id: studentId, status: 'APPROVED' };

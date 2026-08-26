@@ -3,7 +3,8 @@ const studentCharacterService = require('./student_character.service');
 exports.getCharacterReport = async (req, res, next) => {
     try {
         const studentId = req.params.id;
-        const reportData = await studentCharacterService.getCharacterReportData(studentId);
+        const academicYearId = req.query.academic_year_id || null;
+        const reportData = await studentCharacterService.getCharacterReportData(studentId, academicYearId);
         res.json({
             success: true,
             data: reportData
@@ -17,9 +18,10 @@ exports.exportCharacterReportPdf = async (req, res, next) => {
     try {
         const studentId = req.params.id;
         const notes = req.query.notes || '';
+        const academicYearId = req.query.academic_year_id || null;
 
         // 1. Fetch JSON Data
-        const reportData = await studentCharacterService.getCharacterReportData(studentId);
+        const reportData = await studentCharacterService.getCharacterReportData(studentId, academicYearId);
 
         // 2. Generate PDF stream/buffer
         const pdfBuffer = await studentCharacterService.generatePdfBuffer(reportData, notes);
