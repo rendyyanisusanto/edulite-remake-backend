@@ -46,6 +46,7 @@ const attendanceRoutes = require('../modules/attendance/attendance.routes');
 const studentAttendanceRoutes = require('../modules/student-attendance/student_attendance.routes');
 const studentToiletRoutes = require('../modules/student-toilet/student_toilet.routes');
 const tahfidzAttendanceRoutes = require('../modules/tahfidz-attendance/tahfidz_attendance.routes');
+const tahfidzKioskRoutes = require('../modules/tahfidz-kiosks/tahfidz_kiosk.routes');
 
 const extracurricularRoutes = require('../modules/extracurricular/extracurricular.routes');
 const extracurricularReportRoutes = require('../modules/extracurricular/report.routes');
@@ -117,6 +118,7 @@ router.use('/attendance', attendanceRoutes);
 router.use('/', studentAttendanceRoutes);
 router.use('/', studentToiletRoutes);
 router.use('/', tahfidzAttendanceRoutes);
+router.use('/tahfidz-kiosks', tahfidzKioskRoutes);
 
 router.use('/extracurricular/reports', extracurricularReportRoutes);
 router.use('/extracurricular', extracurricularRoutes);
