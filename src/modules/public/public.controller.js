@@ -159,6 +159,33 @@ exports.verifyDocument = async (req, res, next) => {
             });
         }
 
+        if (type === 'positive_point') {
+            const { StudentPositivePoint, Student, PositivePointType } = require('../../models');
+            const positivePoint = await StudentPositivePoint.findByPk(id, {
+                include: [
+                    { model: Student, as: 'student', attributes: ['full_name', 'nis'] },
+                    { model: PositivePointType, as: 'type', attributes: ['name', 'points'] }
+                ],
+                attributes: ['id', 'date', 'status']
+            });
+
+            if (!positivePoint) {
+                return res.json({ success: false, message: 'Document not found' });
+            }
+
+            return res.json({
+                success: true,
+                message: 'Document is verified',
+                data: {
+                    type: 'Poin Positif Siswa',
+                    document_id: positivePoint.id,
+                    student_name: positivePoint.student?.full_name,
+                    date: positivePoint.date,
+                    status: positivePoint.status
+                }
+            });
+        }
+
         return res.status(400).json({ success: false, message: 'Unsupported document type' });
     } catch (error) {
         next(error);

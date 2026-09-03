@@ -47,6 +47,11 @@ class StudentPositivePointService {
             ]
         });
         if (!item) throw new Error('Student Positive Point not found');
+
+        const crypto = require('crypto');
+        const secret = process.env.VERIFY_SECRET || 'edulite-secret-2026';
+        item.dataValues.verify_token = crypto.createHash('md5').update(`positive_point-${item.id}-${secret}`).digest('hex');
+
         return item;
     }
 
