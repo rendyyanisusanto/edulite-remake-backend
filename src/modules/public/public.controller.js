@@ -116,3 +116,51 @@ exports.kioskManualToiletScan = async (req, res, next) => {
         next(error);
     }
 };
+
+exports.verifyDocument = async (req, res, next) => {
+    try {
+        const { type, id, token } = req.query;
+        if (!type || !id || !token) {
+            return res.status(400).json({ success: false, message: 'Type, ID, and Token are required' });
+        }
+
+        const crypto = require('crypto');
+        const secret = process.env.VERIFY_SECRET || 'edulite-secret-2026';
+        const expectedToken = crypto.createHash('md5').update(`${type}-${id}-${secret}`).digest('hex');
+
+        if (token !== expectedToken) {
+            return res.status(400).json({ success: false, message: 'Invalid verify token. Document might be forged.' });
+        }
+
+        if (type === 'violation') {
+            const { StudentViolation, Student, ViolationType } = require('../../models');
+            const violation = await StudentViolation.findByPk(id, {
+                include: [
+                    { model: Student, as: 'student', attributes: ['full_name', 'nis'] },
+                    { model: ViolationType, as: 'type', attributes: ['name', 'point'] }
+                ],
+                attributes: ['id', 'date', 'status']
+            });
+
+            if (!violation) {
+                return res.json({ success: false, message: 'Document not found' });
+            }
+
+            return res.json({
+                success: true,
+                message: 'Document is verified',
+                data: {
+                    type: 'Pelanggaran Siswa',
+                    document_id: violation.id,
+                    student_name: violation.student?.full_name,
+                    date: violation.date,
+                    status: violation.status
+                }
+            });
+        }
+
+        return res.status(400).json({ success: false, message: 'Unsupported document type' });
+    } catch (error) {
+        next(error);
+    }
+};

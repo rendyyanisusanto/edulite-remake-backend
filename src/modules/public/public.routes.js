@@ -5,6 +5,7 @@ const publicController = require('./public.controller');
 const publicTahfidzController = require('./public_tahfidz.controller');
 
 router.get('/student-dashboard/:id', publicController.getStudentDashboard);
+router.get('/verify', publicController.verifyDocument);
 
 // Manual Kiosk endpoints
 router.get('/kiosk/manual/students/search', publicController.kioskManualSearchStudents);

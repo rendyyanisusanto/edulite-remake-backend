@@ -48,6 +48,11 @@ class StudentViolationService {
             ]
         });
         if (!item) throw new Error('Student Violation not found');
+
+        const crypto = require('crypto');
+        const secret = process.env.VERIFY_SECRET || 'edulite-secret-2026';
+        item.dataValues.verify_token = crypto.createHash('md5').update(`violation-${item.id}-${secret}`).digest('hex');
+
         return item;
     }
 
