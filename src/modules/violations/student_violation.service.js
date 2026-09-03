@@ -16,9 +16,39 @@ class StudentViolationService {
                 { description: { [Op.like]: `%${search}%` } }
             ];
         }
-        
         if (query.academic_year_id) {
             where.academic_year_id = query.academic_year_id;
+        }
+
+        if (query.date_from && query.date_to) {
+            where.date = {
+                [Op.between]: [query.date_from, query.date_to]
+            };
+        } else if (query.date_from) {
+            where.date = { [Op.gte]: query.date_from };
+        } else if (query.date_to) {
+            where.date = { [Op.lte]: query.date_to };
+        }
+
+        if (query.student_id) {
+            where.student_id = query.student_id;
+        }
+
+        if (query.class_id && query.academic_year_id) {
+            const { StudentClassHistory } = require('../../models');
+            const classHistories = await StudentClassHistory.findAll({
+                where: { class_id: query.class_id, academic_year_id: query.academic_year_id },
+                attributes: ['student_id']
+            });
+            const studentIdsInClass = classHistories.map(h => h.student_id);
+            // If student_id was also specified, only use it if it's in the class.
+            if (where.student_id) {
+                if (!studentIdsInClass.includes(Number(where.student_id))) {
+                    where.student_id = -1; // impossible match
+                }
+            } else {
+                where.student_id = { [Op.in]: studentIdsInClass };
+            }
         }
 
         const { count, rows } = await StudentViolation.findAndCountAll({
@@ -74,6 +104,67 @@ class StudentViolationService {
     async delete(id) {
         const item = await this.findById(id);
         return await item.destroy();
+    }
+
+    async getTrend(query) {
+        const { sequelize } = require('../../models');
+        const where = {};
+
+        if (query.academic_year_id) {
+            where.academic_year_id = query.academic_year_id;
+        }
+
+        if (query.date_from && query.date_to) {
+            where.date = {
+                [Op.between]: [query.date_from, query.date_to]
+            };
+        } else if (query.date_from) {
+            where.date = { [Op.gte]: query.date_from };
+        } else if (query.date_to) {
+            where.date = { [Op.lte]: query.date_to };
+        }
+
+        if (query.student_id) {
+            where.student_id = query.student_id;
+        }
+
+        if (query.class_id && query.academic_year_id) {
+            const { StudentClassHistory } = require('../../models');
+            const classHistories = await StudentClassHistory.findAll({
+                where: { class_id: query.class_id, academic_year_id: query.academic_year_id },
+                attributes: ['student_id']
+            });
+            const studentIdsInClass = classHistories.map(h => h.student_id);
+            if (where.student_id) {
+                if (!studentIdsInClass.includes(Number(where.student_id))) {
+                    where.student_id = -1; // impossible match
+                }
+            } else {
+                where.student_id = { [Op.in]: studentIdsInClass };
+            }
+        }
+
+        let groupFormat = '%Y-%m-%d'; // daily
+        if (query.period === 'weekly') {
+            // Tahun-Minggu (misal 2026-35)
+            groupFormat = '%x-%v';
+        } else if (query.period === 'monthly') {
+            // Tahun-Bulan (misal 2026-09)
+            groupFormat = '%Y-%m';
+        }
+
+        const trends = await StudentViolation.findAll({
+            where,
+            attributes: [
+                [sequelize.fn('DATE_FORMAT', sequelize.col('date'), groupFormat), 'period_label'],
+                [sequelize.fn('COUNT', sequelize.col('id')), 'total']
+            ],
+            group: ['period_label'],
+            order: [[sequelize.literal('period_label'), 'ASC']],
+            raw: true
+        });
+
+        return trends;
     }
 }
 

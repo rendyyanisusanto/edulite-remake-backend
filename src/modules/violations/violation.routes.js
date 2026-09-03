@@ -24,6 +24,7 @@ router.delete('/types/:id', authMiddleware, permissionMiddleware('violation_type
 
 // Student Violations
 router.get('/students', authMiddleware, permissionMiddleware('student_violation.view'), studentCtrl.findAll);
+router.get('/students/statistics/trend', authMiddleware, permissionMiddleware('student_violation.view'), studentCtrl.getTrendStatistics);
 router.get('/students/:id', authMiddleware, permissionMiddleware('student_violation.view'), studentCtrl.findById);
 router.post('/students', authMiddleware, permissionMiddleware('student_violation.create'), studentCtrl.create);
 router.put('/students/:id', authMiddleware, permissionMiddleware('student_violation.update'), studentCtrl.update);
