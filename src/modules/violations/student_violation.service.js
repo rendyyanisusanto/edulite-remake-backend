@@ -166,6 +166,66 @@ class StudentViolationService {
 
         return trends;
     }
+
+    async getByType(query) {
+        const { sequelize, ViolationType } = require('../../models');
+        const where = {};
+
+        if (query.academic_year_id) {
+            where.academic_year_id = query.academic_year_id;
+        }
+
+        if (query.date_from && query.date_to) {
+            where.date = {
+                [Op.between]: [query.date_from, query.date_to]
+            };
+        } else if (query.date_from) {
+            where.date = { [Op.gte]: query.date_from };
+        } else if (query.date_to) {
+            where.date = { [Op.lte]: query.date_to };
+        }
+
+        if (query.student_id) {
+            where.student_id = query.student_id;
+        }
+
+        if (query.class_id && query.academic_year_id) {
+            const { StudentClassHistory } = require('../../models');
+            const classHistories = await StudentClassHistory.findAll({
+                where: { class_id: query.class_id, academic_year_id: query.academic_year_id },
+                attributes: ['student_id']
+            });
+            const studentIdsInClass = classHistories.map(h => h.student_id);
+            if (where.student_id) {
+                if (!studentIdsInClass.includes(Number(where.student_id))) {
+                    where.student_id = -1; // impossible match
+                }
+            } else {
+                where.student_id = { [Op.in]: studentIdsInClass };
+            }
+        }
+
+        const byType = await StudentViolation.findAll({
+            where,
+            attributes: [
+                'type_id',
+                [sequelize.fn('COUNT', sequelize.col('StudentViolation.id')), 'total']
+            ],
+            include: [
+                {
+                    model: ViolationType,
+                    as: 'type',
+                    attributes: ['name']
+                }
+            ],
+            group: ['type_id', 'type.id', 'type.name'],
+            order: [[sequelize.fn('COUNT', sequelize.col('StudentViolation.id')), 'DESC']],
+            raw: true,
+            nest: true
+        });
+
+        return byType;
+    }
 }
 
 module.exports = new StudentViolationService();
