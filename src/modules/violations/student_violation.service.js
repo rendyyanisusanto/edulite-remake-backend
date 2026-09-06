@@ -215,10 +215,10 @@ class StudentViolationService {
                 {
                     model: ViolationType,
                     as: 'type',
-                    attributes: ['name']
+                    attributes: ['name', 'point']
                 }
             ],
-            group: ['type_id', 'type.id', 'type.name'],
+            group: ['type_id', 'type.id', 'type.name', 'type.point'],
             order: [[sequelize.fn('COUNT', sequelize.col('StudentViolation.id')), 'DESC']],
             raw: true,
             nest: true
