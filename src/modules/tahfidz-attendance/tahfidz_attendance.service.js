@@ -115,7 +115,15 @@ class TahfidzAttendanceService {
         } else if (start_date) {
             where.attendance_date = { [Op.gte]: start_date };
         }
-        if (class_id) where.class_id = class_id;
+        if (class_id) {
+            if (Array.isArray(class_id)) {
+                where.class_id = { [Op.in]: class_id };
+            } else if (typeof class_id === 'string' && class_id.includes(',')) {
+                where.class_id = { [Op.in]: class_id.split(',') };
+            } else {
+                where.class_id = class_id;
+            }
+        }
         if (student_id) where.student_id = student_id;
         if (status) where.status = status;
 
