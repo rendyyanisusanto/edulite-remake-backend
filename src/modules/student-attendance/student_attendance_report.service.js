@@ -1,4 +1,4 @@
-const { StudentAttendance, StudentTahfidzAttendance, Student, Class, StudentClassHistory, AcademicYear } = require('../../models');
+const { StudentDailyAttendance, StudentTahfidzAttendance, Student, Class, StudentClassHistory, AcademicYear } = require('../../models');
 const { Op } = require('sequelize');
 
 class StudentAttendanceReportService {
@@ -62,13 +62,13 @@ class StudentAttendanceReportService {
 
         const studentIds = students.map(s => s.id);
 
-        // Fetch regular school attendance
-        const attendances = await StudentAttendance.findAll({
+        // Fetch regular school attendance from daily attendances (RFID system)
+        const attendances = await StudentDailyAttendance.findAll({
             where: {
                 student_id: { [Op.in]: studentIds },
                 attendance_date: { [Op.between]: [startDate, endDate] }
             },
-            attributes: ['student_id', 'attendance_date', 'status']
+            attributes: ['student_id', 'attendance_date', 'attendance_status']
         });
 
         // Map school attendance by student_id and date
@@ -77,7 +77,7 @@ class StudentAttendanceReportService {
             if (!attendanceMap[att.student_id]) {
                 attendanceMap[att.student_id] = {};
             }
-            attendanceMap[att.student_id][att.attendance_date] = att.status;
+            attendanceMap[att.student_id][att.attendance_date] = att.attendance_status;
         });
 
         let tahfidzMap = {};
@@ -107,19 +107,12 @@ class StudentAttendanceReportService {
         }
 
         const mapStatusToCode = (status) => {
-            switch (status) {
-                case 'HADIR':
-                case 'TERLAMBAT':
-                    return 'H';
-                case 'IZIN':
-                    return 'I';
-                case 'SAKIT':
-                    return 'S';
-                case 'ALPA':
-                    return 'A';
-                default:
-                    return '-';
-            }
+            const s = status.toUpperCase();
+            if (s === 'PRESENT' || s === 'LATE' || s === 'HADIR' || s === 'TERLAMBAT') return 'H';
+            if (s === 'PERMISSION' || s === 'IZIN') return 'I';
+            if (s === 'SICK' || s === 'SAKIT') return 'S';
+            if (s === 'ABSENT' || s === 'ALPA') return 'A';
+            return '-';
         };
 
         const resultStudents = students.map(student => {
