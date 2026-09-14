@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 const express = require('express');
 const router = express.Router();
@@ -10,6 +10,7 @@ const scanController = require('./student_attendance_scan.controller');
 const shiftController = require('./student_attendance_shift.controller');
 const correctionController = require('./student_attendance_correction.controller');
 const attendanceController = require('./student_attendance.controller');
+const attendanceReportController = require('./student_attendance_report.controller');
 
 // Configure multer for file upload
 const upload = multer({
@@ -73,6 +74,9 @@ router.patch('/student-attendance-corrections/:id/review', authMiddleware, corre
 
 // List with filters and pagination
 router.get('/v1/student-attendances', authMiddleware, attendanceController.getList);
+
+// Recap Matrix Report
+router.get('/v1/student-attendances/reports/recap-matrix', authMiddleware, attendanceReportController.getRecapMatrix);
 
 // Get summary statistics
 router.get('/v1/student-attendances/summary', authMiddleware, attendanceController.getSummary);

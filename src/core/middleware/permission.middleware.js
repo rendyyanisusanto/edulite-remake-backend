@@ -43,6 +43,7 @@ const permissionMiddleware = (requiredPermission) => {
 
                 const permissions = role.permissions || [];
                 const found = permissions.find(p => p.code === requiredPermission);
+                console.log(`[DEBUG PERM] Checking role ${role.name} for ${requiredPermission}: found? ${!!found}`);
                 if (found) {
                     hasPermission = true;
                     break;

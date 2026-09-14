@@ -62,6 +62,9 @@ const studentItemReceiptRoutes = require('../modules/student-item-deposits/stude
 // Public Module
 const publicRoutes = require('../modules/public/public.routes');
 
+// CBT
+const cbtRoutes = require('../modules/cbt/cbt.routes');
+
 router.get('/ping', (req, res) => {
     res.json({ message: 'pong', timestamp: new Date() });
 });
@@ -131,5 +134,8 @@ router.use('/', studentItemDepositRoutes.kioskRouter);
 router.use('/', studentItemDepositRoutes.router);
 router.use('/', studentItemReportRoutes);
 router.use('/', studentItemReceiptRoutes);
+
+// CBT
+router.use('/cbt', cbtRoutes);
 
 module.exports = router;
