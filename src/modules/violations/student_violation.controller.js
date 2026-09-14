@@ -6,3 +6,5 @@ exports.update = async (req, res, next) => { try { res.json({ success: true, dat
 exports.delete = async (req, res, next) => { try { await svc.delete(req.params.id); res.json({ success: true, message: 'Deleted' }); } catch (e) { next(e); } };
 exports.getTrendStatistics = async (req, res, next) => { try { res.json({ success: true, data: await svc.getTrend(req.query) }); } catch (e) { next(e); } };
 exports.getTypeStatistics = async (req, res, next) => { try { res.json({ success: true, data: await svc.getByType(req.query) }); } catch (e) { next(e); } };
+exports.getPotentialViolations = async (req, res, next) => { try { res.json({ success: true, data: await svc.getPotentialViolations(req.query) }); } catch (e) { next(e); } };
+exports.convertPotentialViolations = async (req, res, next) => { try { res.status(201).json({ success: true, data: await svc.convertPotentialViolations(req.body, req.user.id) }); } catch (e) { next(e); } };
