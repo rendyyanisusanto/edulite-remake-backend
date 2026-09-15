@@ -5,14 +5,18 @@ module.exports = {
   async up(queryInterface, Sequelize) {
     // 1. Add Permissions
     const permissions = [
-      { name: 'View Student Leave Requests', code: 'counseling.leave_requests.view', description: 'Lihat data perijinan siswa' },
-      { name: 'Create Student Leave Request', code: 'counseling.leave_requests.create', description: 'Buat pengajuan perijinan siswa' },
-      { name: 'Update Student Leave Request', code: 'counseling.leave_requests.update', description: 'Edit data perijinan siswa' },
-      { name: 'Delete Student Leave Request', code: 'counseling.leave_requests.delete', description: 'Hapus data perijinan siswa' },
-      { name: 'Approve/Reject Student Leave Request', code: 'counseling.leave_requests.approve', description: 'Persetujuan perijinan siswa' }
+      { name: 'View Student Leave Requests', code: 'counseling.leave_requests.view', description: 'Lihat data perijinan siswa', platform: 'WEB' },
+      { name: 'Create Student Leave Request', code: 'counseling.leave_requests.create', description: 'Buat pengajuan perijinan siswa', platform: 'WEB' },
+      { name: 'Update Student Leave Request', code: 'counseling.leave_requests.update', description: 'Edit data perijinan siswa', platform: 'WEB' },
+      { name: 'Delete Student Leave Request', code: 'counseling.leave_requests.delete', description: 'Hapus data perijinan siswa', platform: 'WEB' },
+      { name: 'Approve/Reject Student Leave Request', code: 'counseling.leave_requests.approve', description: 'Persetujuan perijinan siswa', platform: 'WEB' }
     ];
 
-    await queryInterface.bulkInsert('permissions', permissions, {});
+    try {
+      await queryInterface.bulkInsert('permissions', permissions, { ignoreDuplicates: true });
+    } catch (e) {
+      console.log('Permissions already exist or error:', e.message);
+    }
 
     const insertedPermissions = await queryInterface.sequelize.query(
       `SELECT id, code FROM permissions WHERE code IN (${permissions.map(p => `'${p.code}'`).join(',')});`
@@ -55,7 +59,11 @@ module.exports = {
       is_active: true
     };
 
-    await queryInterface.bulkInsert('menus', [menu], {});
+    try {
+      await queryInterface.bulkInsert('menus', [menu], { ignoreDuplicates: true });
+    } catch (e) {
+      console.log('Menu already exists or error:', e.message);
+    }
 
     const insertedMenu = await queryInterface.sequelize.query(
       `SELECT id FROM menus WHERE route = '/student-leave-requests';`
@@ -68,7 +76,11 @@ module.exports = {
       permission_id: p.id
     }));
 
-    await queryInterface.bulkInsert('menu_permissions', menuPermissions, {});
+    try {
+      await queryInterface.bulkInsert('menu_permissions', menuPermissions, { ignoreDuplicates: true });
+    } catch (e) {
+      console.log('Menu permissions already exist or error:', e.message);
+    }
 
     // 4. Assign permissions to Super Admin role
     const roles = await queryInterface.sequelize.query(
@@ -81,7 +93,11 @@ module.exports = {
             role_id: roleId,
             permission_id: p.id
         }));
-        await queryInterface.bulkInsert('role_permissions', rolePermissions, {});
+        try {
+            await queryInterface.bulkInsert('role_permissions', rolePermissions, { ignoreDuplicates: true });
+        } catch (e) {
+            console.log('Role permissions already exist or error:', e.message);
+        }
     }
   },
 
