@@ -72,7 +72,7 @@ module.exports = {
 
     // 4. Assign permissions to Super Admin role
     const roles = await queryInterface.sequelize.query(
-      `SELECT id FROM roles WHERE code = 'superadmin' LIMIT 1;`
+      `SELECT id FROM roles WHERE LOWER(name) = 'super admin' OR LOWER(name) = 'superadmin' LIMIT 1;`
     );
     
     if (roles[0].length > 0) {
