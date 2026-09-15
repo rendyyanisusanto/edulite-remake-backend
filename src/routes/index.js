@@ -28,6 +28,7 @@ const academicRoutes = require('../modules/academic/academic.routes');
 const violationRoutes = require('../modules/violations/violation.routes');
 const counselingCaseRoutes = require('../modules/counseling-cases/counseling_case.routes');
 const counselingSessionRoutes = require('../modules/counseling-sessions/counseling_session.routes');
+const studentLeaveRequestRoutes = require('../modules/student-leave-requests/student_leave_request.routes');
 
 // Achievements
 const achievementMainRoutes = require('../modules/achievements/achievement.routes');
@@ -96,9 +97,11 @@ router.use('/academic', academicRoutes);
 // Violations
 router.use('/violations', violationRoutes);
 
-// Counseling Cases
+// Counseling Cases & Leaves
 router.use('/counseling-cases', counselingCaseRoutes);
 router.use('/counseling-sessions', counselingSessionRoutes);
+router.use('/student-leave-requests', studentLeaveRequestRoutes.router);
+router.use('/', studentLeaveRequestRoutes.kioskRouter);
 
 // Positive Points
 router.use('/positive-points', positivePointRoutes);
