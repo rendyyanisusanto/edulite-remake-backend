@@ -9,10 +9,17 @@ const studentController = require('../students/student.controller');
 const { authMiddleware } = require('../../core/middleware/auth.middleware');
 const { permissionMiddleware } = require('../../core/middleware/permission.middleware');
 
+const fs = require('fs');
+
+const uploadDir = path.join(__dirname, '../../../public/uploads/student_leaves');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 // Local upload config
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, path.join(__dirname, '../../../public/uploads/student_leaves'));
+        cb(null, uploadDir);
     },
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
