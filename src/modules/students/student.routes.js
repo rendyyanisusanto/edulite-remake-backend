@@ -14,6 +14,8 @@ router.get('/template', authMiddleware, permissionMiddleware('student.view'), st
 router.get('/export/excel', authMiddleware, permissionMiddleware('student.export'), studentController.exportExcel);
 router.post('/import', authMiddleware, permissionMiddleware('student.import'), upload.single('file'), studentController.importExcel);
 
+router.post('/character-report/bulk/data', authMiddleware, permissionMiddleware('character_report.view'), studentCharacterController.getBulkCharacterReport);
+router.post('/character-report/bulk/pdf', authMiddleware, permissionMiddleware('character_report.view'), studentCharacterController.exportBulkCharacterReportPdf);
 router.get('/:id/character-report', authMiddleware, permissionMiddleware('character_report.view'), studentCharacterController.getCharacterReport);
 router.get('/:id/character-report/pdf', authMiddleware, permissionMiddleware('character_report.view'), studentCharacterController.exportCharacterReportPdf);
 router.get('/:id/mutations', authMiddleware, permissionMiddleware('student.mutation.view'), studentMutationController.findByStudentId);

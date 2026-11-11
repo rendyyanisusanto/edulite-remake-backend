@@ -173,18 +173,19 @@ class StudentCharacterService {
     }
 
     async generatePdfBuffer(reportData, customNotes = '') {
-        return new Promise((resolve, reject) => {
-            try {
-                // Adjust margins for a neater look
-                const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
-                const buffers = [];
+        return this.generateMultiPdfBuffer([{ reportData, notes: customNotes }]);
+    }
 
-                doc.on('data', buffers.push.bind(buffers));
-                doc.on('end', () => {
-                    const pdfData = Buffer.concat(buffers);
-                    resolve(pdfData);
-                });
+    async getBulkReportData(items, academicYearId = null) {
+        const results = [];
+        for (const item of items) {
+            const reportData = await this.getCharacterReportData(item.student_id, academicYearId);
+            results.push({ reportData, notes: item.notes || '' });
+        }
+        return results;
+    }
 
+    renderReport(doc, reportData, customNotes = '') {
                 // Helper for drawing lines
                 const drawLine = (y) => {
                     doc.strokeColor('#e5e7eb')
@@ -429,7 +430,19 @@ class StudentCharacterService {
                 doc.moveDown(5);
                 doc.font('Helvetica-Bold');
                 doc.text('Rendy Yani Susanto, S.Pd', 350, doc.y, { lineBreak: false });
+    }
 
+    async generateMultiPdfBuffer(entries) {
+        return new Promise((resolve, reject) => {
+            try {
+                const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
+                const buffers = [];
+                doc.on('data', buffers.push.bind(buffers));
+                doc.on('end', () => resolve(Buffer.concat(buffers)));
+                entries.forEach((e, i) => {
+                    if (i > 0) doc.addPage();
+                    this.renderReport(doc, e.reportData, e.notes);
+                });
                 // Footer numbering
                 const pages = doc.bufferedPageRange();
                 for (let i = 0; i < pages.count; i++) {
@@ -441,9 +454,7 @@ class StudentCharacterService {
                         { align: 'center', lineBreak: false }
                     );
                 }
-
                 doc.end();
-
             } catch (err) {
                 reject(err);
             }

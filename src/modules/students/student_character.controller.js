@@ -43,3 +43,42 @@ exports.exportCharacterReportPdf = async (req, res, next) => {
         next(error);
     }
 };
+
+const parseBulkItems = (body) => {
+    const items = Array.isArray(body.items) ? body.items.filter(i => i && i.student_id) : [];
+    if (!items.length) {
+        const err = new Error('Daftar siswa tidak boleh kosong');
+        err.statusCode = 400;
+        throw err;
+    }
+    if (items.length > 200) {
+        const err = new Error('Maksimal 200 siswa per permintaan');
+        err.statusCode = 400;
+        throw err;
+    }
+    return items;
+};
+
+exports.getBulkCharacterReport = async (req, res, next) => {
+    try {
+        const items = parseBulkItems(req.body);
+        const data = await studentCharacterService.getBulkReportData(items, req.body.academic_year_id || null);
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.exportBulkCharacterReportPdf = async (req, res, next) => {
+    try {
+        const items = parseBulkItems(req.body);
+        const entries = await studentCharacterService.getBulkReportData(items, req.body.academic_year_id || null);
+        const pdfBuffer = await studentCharacterService.generateMultiPdfBuffer(entries);
+        const className = String(req.body.class_name || 'Kelas').replace(/[^\w\s-]/g, '');
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Rapor Karakter - ${className}.pdf"`);
+        res.send(pdfBuffer);
+    } catch (error) {
+        next(error);
+    }
+};
