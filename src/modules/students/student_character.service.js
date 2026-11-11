@@ -156,12 +156,19 @@ class StudentCharacterService {
         };
 
 
+        // Class during the selected academic year (fallback to latest history if no year resolved)
+        const histories = student.class_history || [];
+        const yearHistory = activeYearId
+            ? histories.find(h => Number(h.academic_year_id) === Number(activeYearId))
+            : [...histories].sort((a, b) => b.id - a.id)[0];
+        const className = yearHistory && yearHistory.class_info ? yearHistory.class_info.name : '-';
+
         return {
             student: {
                 id: student.id,
                 name: student.full_name,
                 nis: student.nis,
-                class_name: student.class_history && student.class_history.length > 0 && student.class_history[0].class_info ? student.class_history[0].class_info.name : '-',
+                class_name: className,
                 photo: student.photo,
                 active_academic_year: yearStr
             },
