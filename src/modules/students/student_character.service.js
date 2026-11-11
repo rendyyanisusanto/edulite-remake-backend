@@ -180,7 +180,7 @@ class StudentCharacterService {
         const results = [];
         for (const item of items) {
             const reportData = await this.getCharacterReportData(item.student_id, academicYearId);
-            results.push({ reportData, notes: item.notes || '' });
+            results.push({ reportData, notes: (item.notes && item.notes.trim()) ? item.notes : 'Tidak ada catatan khusus.' });
         }
         return results;
     }
