@@ -35,11 +35,23 @@ exports.getStudentDashboard = async (studentId, date, filter) => {
     
     if (filter === 'last7days') {
         startDate.setDate(startDate.getDate() - 6); // 7 days inclusive
+    } else if (filter === 'month') {
+        startDate.setDate(1); // from first day of the month
     }
 
     const tahfidzAttendances = await StudentTahfidzAttendance.findAll({
         where: { 
             student_id: studentId, 
+            attendance_date: {
+                [Op.between]: [startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]
+            }
+        },
+        order: [['attendance_date', 'DESC']]
+    });
+
+    const dailyAttendances = await StudentDailyAttendance.findAll({
+        where: {
+            student_id: studentId,
             attendance_date: {
                 [Op.between]: [startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]
             }
@@ -102,6 +114,27 @@ exports.getStudentDashboard = async (studentId, date, filter) => {
         }
     }
 
+    dailyAttendances.filter(a => a.attendance_date === date).forEach(a => {
+        if (a.clock_in_at) {
+            timeline.push({
+                time: a.clock_in_at,
+                title: a.entry_status === 'LATE' ? 'Masuk Sekolah (Terlambat)' : 'Masuk Sekolah',
+                type: 'attendance_in',
+                icon: '🚪',
+                details: `Presensi masuk: ${formatTime(a.clock_in_at)}${a.late_minutes ? ` - Terlambat ${a.late_minutes} mnt` : ''}`
+            });
+        }
+        if (a.clock_out_at) {
+            timeline.push({
+                time: a.clock_out_at,
+                title: 'Pulang Sekolah',
+                type: 'attendance_out',
+                icon: '🚪',
+                details: `Presensi pulang: ${formatTime(a.clock_out_at)}`
+            });
+        }
+    });
+
     toiletPermissions.forEach(tp => {
         if (tp.exit_at) {
             timeline.push({
@@ -162,7 +195,7 @@ exports.getStudentDashboard = async (studentId, date, filter) => {
     });
 
     const summary = {
-        attendance: tahfidzAttendances.length > 0 ? 'Terekap' : 'Belum Ada',
+        attendance: (dailyAttendances.length > 0 || tahfidzAttendances.length > 0) ? 'Terekap' : 'Belum Ada',
         toilet_count: toiletPermissions.length,
         violation_count: violations.length,
         permission_count: permissions.length,
@@ -179,9 +212,20 @@ exports.getStudentDashboard = async (studentId, date, filter) => {
             class_name: classHistory && classHistory.class_info ? classHistory.class_info.name : '-'
         },
         summary,
+        daily_attendances: dailyAttendances.map(a => ({
+            date: a.attendance_date,
+            status: a.attendance_status,
+            entry_status: a.entry_status,
+            exit_status: a.exit_status,
+            clock_in: a.clock_in_at ? formatTime(a.clock_in_at) : null,
+            clock_out: a.clock_out_at ? formatTime(a.clock_out_at) : null,
+            late_minutes: a.late_minutes,
+            notes: a.note
+        })),
         tahfidz_attendances: tahfidzAttendances.map(a => ({
             date: a.attendance_date,
             status: a.status,
+            time: (a.created_at || a.createdAt) ? formatTime(a.created_at || a.createdAt) : null,
             notes: a.notes
         })),
         toilet_permissions: toiletPermissions.map(tp => ({
