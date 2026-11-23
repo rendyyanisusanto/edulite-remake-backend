@@ -105,9 +105,15 @@ module.exports = function classReportLayout({
             <td>${esc(student.nis || '-')}</td>
             <td>${esc(student.nisn || '-')}</td>
             <td>${esc(student.full_name || '-')}</td>
-            <td class="text-center">
-              ${student.qrCode ? `<img src="${student.qrCode}" alt="QR" style="width:40px;height:40px;margin-bottom:2px;"/><br/>` : ''}
-              <a href="${esc(student.parentLink)}" style="font-size:8px;color:#0066cc;text-decoration:none;" target="_blank">Link Wali</a>
+            <td>
+              <table style="width:100%;border:none;border-collapse:collapse;"><tr>
+                <td style="border:none;width:46px;padding:0 4px 0 0;vertical-align:middle;">
+                  ${student.qrCode ? `<img src="${student.qrCode}" alt="QR" style="width:42px;height:42px;"/>` : ''}
+                </td>
+                <td style="border:none;padding:0;vertical-align:middle;text-align:left;">
+                  <span style="font-size:8px;color:#0066cc;word-break:break-all;user-select:all;">${esc(student.parentLink)}</span>
+                </td>
+              </tr></table>
             </td>
           </tr>`;
         }).join('') : '<tr><td colspan="6" class="text-center">Tidak ada data siswa</td></tr>'}
