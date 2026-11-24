@@ -6,6 +6,8 @@ module.exports = (sequelize, DataTypes) => {
         static associate(models) {
             Teacher.belongsTo(models.User, { foreignKey: 'user_id', as: 'user' });
             Teacher.hasMany(models.ExtracurricularCoach, { foreignKey: 'teacher_id', as: 'extracurricular_coach_profiles' });
+            Teacher.hasMany(models.LessonAttendanceSession, { foreignKey: 'teacher_id', as: 'lesson_attendance_sessions' });
+            Teacher.hasMany(models.LessonAttendanceLog, { foreignKey: 'teacher_id', as: 'lesson_attendance_logs' });
         }
     }
     Teacher.init({
@@ -33,12 +35,25 @@ module.exports = (sequelize, DataTypes) => {
         photo: {
             type: DataTypes.STRING(255),
             allowNull: true
+        },
+        attendance_pin_hash: {
+            type: DataTypes.STRING(255),
+            allowNull: true,
+            defaultValue: null
         }
     }, {
         sequelize,
         modelName: 'Teacher',
         tableName: 'teachers',
         underscored: true,
+        defaultScope: {
+            attributes: { exclude: ['attendance_pin_hash'] }
+        },
+        scopes: {
+            withPinHash: {
+                attributes: {}
+            }
+        }
     });
     return Teacher;
 };

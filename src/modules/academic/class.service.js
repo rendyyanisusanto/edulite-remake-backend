@@ -15,6 +15,12 @@ class ClassService {
 
         const { count, rows } = await Class.findAndCountAll({
             where,
+            attributes: {
+                exclude: ['attendance_token'],
+                include: [
+                    [Class.sequelize.literal('CASE WHEN `Class`.`attendance_token` IS NOT NULL THEN true ELSE false END'), 'attendance_qr_configured']
+                ]
+            },
             include: [
                 { model: Grade, as: 'grade', attributes: ['id', 'name', 'level'] },
                 { model: Department, as: 'department', attributes: ['id', 'name', 'code'] },
@@ -46,12 +52,24 @@ class ClassService {
     }
 
     async create(data) {
-        return await Class.create(data);
+        return await Class.create({
+            grade_id: data.grade_id,
+            department_id: data.department_id || null,
+            name: data.name,
+            homeroom_teacher_id: data.homeroom_teacher_id || null,
+            capacity: data.capacity || null
+        });
     }
 
     async update(id, data) {
         const item = await this.findById(id);
-        return await item.update(data);
+        return await item.update({
+            grade_id: data.grade_id !== undefined ? data.grade_id : item.grade_id,
+            department_id: data.department_id !== undefined ? data.department_id : item.department_id,
+            name: data.name !== undefined ? data.name : item.name,
+            homeroom_teacher_id: data.homeroom_teacher_id !== undefined ? data.homeroom_teacher_id : item.homeroom_teacher_id,
+            capacity: data.capacity !== undefined ? data.capacity : item.capacity
+        });
     }
 
     async delete(id) {

@@ -10,7 +10,13 @@ const {
     PermissionLetter,
     StudentPositivePoint,
     PositivePointType,
-    StudentTahfidzAttendance
+    StudentTahfidzAttendance,
+    LessonAttendanceDetail,
+    LessonAttendanceSession,
+    LessonPeriod,
+    LessonPeriodTemplate,
+    Subject,
+    Teacher
 } = require('../../models');
 const { Op } = require('sequelize');
 
@@ -39,11 +45,14 @@ exports.getStudentDashboard = async (studentId, date, filter) => {
         startDate.setDate(1); // from first day of the month
     }
 
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = endDate.toISOString().split('T')[0];
+
     const tahfidzAttendances = await StudentTahfidzAttendance.findAll({
         where: { 
             student_id: studentId, 
             attendance_date: {
-                [Op.between]: [startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]
+                [Op.between]: [startDateStr, endDateStr]
             }
         },
         order: [['attendance_date', 'DESC']]
@@ -53,11 +62,68 @@ exports.getStudentDashboard = async (studentId, date, filter) => {
         where: {
             student_id: studentId,
             attendance_date: {
-                [Op.between]: [startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]
+                [Op.between]: [startDateStr, endDateStr]
             }
         },
         order: [['attendance_date', 'DESC']]
     });
+
+    const lessonAttendances = await LessonAttendanceDetail.findAll({
+        where: { student_id: studentId },
+        include: [
+            {
+                model: LessonAttendanceSession,
+                as: 'session',
+                required: true,
+                where: {
+                    attendance_date: {
+                        [Op.between]: [startDateStr, endDateStr]
+                    },
+                    cancelled_at: null
+                },
+                include: [
+                    { model: Subject, as: 'subject', attributes: ['id', 'name', 'code'] },
+                    { model: Teacher, as: 'teacher', attributes: ['id', 'full_name'] },
+                    { model: LessonPeriod, as: 'lesson_period', attributes: ['id', 'name', 'period_number'] },
+                    { model: Class, as: 'class_info', attributes: ['id', 'name'] }
+                ]
+            }
+        ],
+        order: [
+            [{ model: LessonAttendanceSession, as: 'session' }, 'attendance_date', 'DESC'],
+            [{ model: LessonAttendanceSession, as: 'session' }, 'period_number', 'ASC'],
+            ['id', 'ASC']
+        ]
+    });
+
+    let activeTemplate = await LessonPeriodTemplate.findOne({
+        where: { is_active: true, is_default: true },
+        order: [['id', 'ASC']]
+    });
+    if (!activeTemplate) {
+        activeTemplate = await LessonPeriodTemplate.findOne({
+            where: { is_active: true },
+            order: [['id', 'ASC']]
+        });
+    }
+
+    const lessonPeriods = activeTemplate
+        ? await LessonPeriod.findAll({
+            where: {
+                template_id: activeTemplate.id,
+                is_active: true,
+                is_attendance_enabled: true,
+                period_number: {
+                    [Op.and]: [
+                        { [Op.ne]: null },
+                        { [Op.gt]: 0 }
+                    ]
+                }
+            },
+            attributes: ['id', 'period_order', 'period_number', 'name', 'start_time', 'end_time'],
+            order: [['period_order', 'ASC'], ['period_number', 'ASC']]
+        })
+        : [];
 
     const toiletPermissions = await StudentToiletPermission.findAll({
         where: { student_id: studentId, permission_date: date },
@@ -194,8 +260,43 @@ exports.getStudentDashboard = async (studentId, date, filter) => {
         item.formatted_time = formatTime(item.time);
     });
 
+    const lessonSummary = {
+        total: lessonAttendances.length,
+        hadir: 0,
+        terlambat: 0,
+        izin: 0,
+        sakit: 0,
+        alpa: 0
+    };
+
+    const formattedLessonAttendances = lessonAttendances.map(item => {
+        const status = item.status;
+        if (status === 'HADIR') lessonSummary.hadir += 1;
+        else if (status === 'TERLAMBAT') lessonSummary.terlambat += 1;
+        else if (status === 'IZIN') lessonSummary.izin += 1;
+        else if (status === 'SAKIT') lessonSummary.sakit += 1;
+        else if (status === 'ALPA') lessonSummary.alpa += 1;
+
+        const session = item.session;
+        return {
+            id: item.id,
+            date: session.attendance_date,
+            period_number: session.period_number,
+            period_name: session.lesson_period?.name || `Jam ke-${session.period_number}`,
+            start_time: formatPeriodTime(session.period_start_time),
+            end_time: formatPeriodTime(session.period_end_time),
+            subject_name: session.subject?.name || '-',
+            subject_code: session.subject?.code || null,
+            teacher_name: session.teacher?.full_name || '-',
+            class_name: session.class_info?.name || '-',
+            status,
+            notes: item.notes || null,
+            session_notes: session.notes || null
+        };
+    });
+
     const summary = {
-        attendance: (dailyAttendances.length > 0 || tahfidzAttendances.length > 0) ? 'Terekap' : 'Belum Ada',
+        attendance: (dailyAttendances.length > 0 || tahfidzAttendances.length > 0 || lessonAttendances.length > 0) ? 'Terekap' : 'Belum Ada',
         toilet_count: toiletPermissions.length,
         violation_count: violations.length,
         permission_count: permissions.length,
@@ -212,6 +313,15 @@ exports.getStudentDashboard = async (studentId, date, filter) => {
             class_name: classHistory && classHistory.class_info ? classHistory.class_info.name : '-'
         },
         summary,
+        lesson_periods: lessonPeriods.map(p => ({
+            id: p.id,
+            period_number: p.period_number,
+            period_name: p.name || `Jam ke-${p.period_number}`,
+            start_time: formatPeriodTime(p.start_time),
+            end_time: formatPeriodTime(p.end_time)
+        })),
+        lesson_summary: lessonSummary,
+        lesson_attendances: formattedLessonAttendances,
         daily_attendances: dailyAttendances.map(a => ({
             date: a.attendance_date,
             status: a.attendance_status,
@@ -261,4 +371,9 @@ function formatTime(dateString) {
     const d = new Date(dateString);
     if (isNaN(d.getTime())) return dateString; // fallback if invalid
     return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' });
+}
+
+function formatPeriodTime(timeString) {
+    if (!timeString) return '-';
+    return String(timeString).slice(0, 5);
 }

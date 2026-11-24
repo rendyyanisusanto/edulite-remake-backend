@@ -19,6 +19,7 @@ module.exports = (sequelize, DataTypes) => {
             User.hasMany(models.StudentMutation, { foreignKey: 'updated_by', as: 'updated_student_mutations' });
             User.hasMany(models.StudentMutation, { foreignKey: 'approved_by', as: 'approved_student_mutations' });
             User.hasMany(models.StudentMutationLog, { foreignKey: 'action_by', as: 'student_mutation_logs' });
+            User.hasMany(models.LessonAttendanceLog, { foreignKey: 'user_id', as: 'lesson_attendance_logs' });
         }
     }
     User.init({

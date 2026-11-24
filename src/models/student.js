@@ -22,6 +22,7 @@ module.exports = (sequelize, DataTypes) => {
             Student.hasMany(models.StudentToiletScanLog, { foreignKey: 'student_id', as: 'toilet_scan_logs' });
             Student.hasMany(models.StudentItemDeposit, { foreignKey: 'student_id', as: 'item_deposits' });
             Student.hasMany(models.StudentItemLoan, { foreignKey: 'student_id', as: 'item_loans' });
+            Student.hasMany(models.LessonAttendanceDetail, { foreignKey: 'student_id', as: 'lesson_attendance_details' });
         }
     }
     Student.init({

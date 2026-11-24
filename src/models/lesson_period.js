@@ -5,6 +5,7 @@ module.exports = (sequelize, DataTypes) => {
     class LessonPeriod extends Model {
         static associate(models) {
             LessonPeriod.belongsTo(models.LessonPeriodTemplate, { foreignKey: 'template_id', as: 'template' });
+            LessonPeriod.hasMany(models.LessonAttendanceSession, { foreignKey: 'lesson_period_id', as: 'lesson_attendance_sessions' });
         }
     }
     LessonPeriod.init({

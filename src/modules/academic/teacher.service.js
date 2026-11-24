@@ -47,6 +47,12 @@ class TeacherService {
 
         const { count, rows } = await Teacher.findAndCountAll({
             where,
+            attributes: {
+                exclude: ['attendance_pin_hash'],
+                include: [
+                    [Teacher.sequelize.literal('CASE WHEN `Teacher`.`attendance_pin_hash` IS NOT NULL THEN true ELSE false END'), 'attendance_pin_configured']
+                ]
+            },
             include: [{ model: User, as: 'user', attributes: ['id', 'email', 'is_active'] }],
             limit,
             offset,
