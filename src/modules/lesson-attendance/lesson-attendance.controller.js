@@ -323,6 +323,19 @@ class LessonAttendanceController {
         }
     }
 
+    async exportMonitoringPdf(req, res, next) {
+        try {
+            const { buffer, filename } = await exportService.generateMonitoringPdf(req.query);
+            res.setHeader('Cache-Control', 'no-store');
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            res.setHeader('Content-Length', buffer.length);
+            res.end(buffer);
+        } catch (error) {
+            handleControllerError(res, next, error, { operation: 'exportMonitoringPdf', actorId: req.user?.id });
+        }
+    }
+
     async listSessions(req, res, next) {
         try {
             const result = await adminService.listSessions(req.query);

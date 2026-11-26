@@ -7,6 +7,7 @@ const db = require('../../models');
 const { SchoolProfile, DocumentSetting } = db;
 const pdfService = require('../../services/pdfService');
 const reportService = require('./lesson-attendance-report.service');
+const adminService = require('./lesson-attendance-admin.service');
 const { ERROR_CODES, AppError } = require('./lesson-attendance.constants');
 
 const MODE_TITLES = {
@@ -481,6 +482,194 @@ class LessonAttendanceExportService {
                 buffer: Buffer.from(pdf),
                 filename: buildFilename(mode, filters, 'pdf')
             };
+        } finally {
+            await browser.close();
+        }
+    }
+
+    async generateMonitoringPdf(query = {}) {
+        const monitoring = await adminService.getMonitoring({
+            attendanceDate: query.attendance_date,
+            academicYearId: query.academic_year_id,
+            gradeId: query.grade_id,
+            departmentId: query.department_id,
+            classId: query.class_id,
+            status: query.status,
+            search: query.search
+        });
+
+        const [schoolProfile, docSetting] = await Promise.all([
+            SchoolProfile.findOne({ attributes: ['name', 'address', 'city', 'logo', 'logo_light'] }),
+            DocumentSetting.findOne({ where: { is_active: true }, order: [['id', 'ASC']], attributes: ['header_image', 'pdf_footer_text'] })
+        ]);
+
+        const headerImageUri = loadLocalLogoDataUri(docSetting?.header_image) || loadLocalLogoDataUri('header.png');
+        const logoDataUri = loadLocalLogoDataUri(schoolProfile?.logo || schoolProfile?.logo_light);
+        const printedAt = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
+        const periods = monitoring.periods || [];
+        const rows = monitoring.rows || [];
+
+        const kopHtml = headerImageUri
+            ? `<div class="kop-banner"><img class="kop-img" src="${headerImageUri}" alt="Kop Sekolah" /></div>`
+            : `<div class="header">
+                ${logoDataUri ? `<img class="logo" src="${logoDataUri}" alt="Logo" />` : ''}
+                <div>
+                  <p class="school-name">${escapeHtml(schoolProfile?.name || 'SEKOLAH')}</p>
+                  <p class="school-addr">${escapeHtml(schoolProfile?.address || '')}${schoolProfile?.city ? ` - ${escapeHtml(schoolProfile.city)}` : ''}</p>
+                </div>
+              </div>`;
+
+        const cellMeta = (status) => {
+            if (status === 'SUBMITTED') return { code: '✓', css: 'background:#dcfce7;color:#166534;font-weight:bold;' };
+            if (status === 'NOT_RECORDED') return { code: '–', css: 'background:#fee2e2;color:#991b1b;font-weight:bold;' };
+            if (status === 'UPCOMING') return { code: '◷', css: 'background:#f3f4f6;color:#6b7280;' };
+            if (status === 'CANCELLED') return { code: '✕', css: 'background:#fef3c7;color:#92400e;font-weight:bold;' };
+            return { code: '?', css: 'background:#f1f5f9;color:#475569;' };
+        };
+
+        const unrecordedClasses = [];
+        const matrixRowsHtml = rows.length === 0
+            ? `<tr><td colspan="${3 + periods.length}" class="c">Tidak ada kelas atau transaksi presensi yang sesuai dengan filter pada tanggal ini.</td></tr>`
+            : rows.map((r, idx) => {
+                const missingPeriods = [];
+                const cellsHtml = periods.map((p) => {
+                    const cell = r.cells?.[p.period_number];
+                    const st = cell?.status || 'UNKNOWN';
+                    if (st === 'NOT_RECORDED') {
+                        missingPeriods.push({
+                            number: p.period_number,
+                            time: `${String(p.start_time || '').slice(0, 5)}–${String(p.end_time || '').slice(0, 5)}`
+                        });
+                    }
+                    const m = cellMeta(st);
+                    return `<td class="c" style="${m.css}">${m.code}</td>`;
+                }).join('');
+
+                if (missingPeriods.length > 0) {
+                    unrecordedClasses.push({
+                        class_name: r.class_name,
+                        active_student_count: r.active_student_count,
+                        missing: missingPeriods
+                    });
+                }
+
+                const missingLabels = missingPeriods.length
+                    ? missingPeriods.map((m) => `J${m.number}`).join(', ')
+                    : '-';
+
+                return `<tr>
+                    <td class="c">${idx + 1}</td>
+                    <td class="name"><strong>${escapeHtml(r.class_name)}</strong>${r.active_student_count > 0 ? `<div class="sub">${r.active_student_count} siswa aktif</div>` : ''}</td>
+                    ${cellsHtml}
+                    <td class="c" style="${missingPeriods.length ? 'color:#991b1b;font-weight:bold;background:#fff5f5;' : 'color:#166534;'}">${escapeHtml(missingLabels)}</td>
+                </tr>`;
+            }).join('');
+
+        const unrecordedTableHtml = unrecordedClasses.length === 0
+            ? '<p class="ok-box">Semua jam pelajaran yang sudah berlangsung telah terabsen pada seluruh kelas yang dipantau.</p>'
+            : `<table class="grid">
+                <thead>
+                  <tr>
+                    <th style="width:28px;">No</th>
+                    <th style="width:160px;">Kelas</th>
+                    <th style="width:85px;">Jumlah Jam Belum Diabsen</th>
+                    <th>Jam Pelajaran Belum Diabsen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${unrecordedClasses.map((u, i) => `<tr>
+                    <td class="c">${i + 1}</td>
+                    <td class="name"><strong>${escapeHtml(u.class_name)}</strong></td>
+                    <td class="c" style="color:#991b1b;font-weight:bold;">${u.missing.length}</td>
+                    <td class="name">${escapeHtml(u.missing.map((m) => `J${m.number} (${m.time})`).join(', '))}</td>
+                  </tr>`).join('')}
+                </tbody>
+              </table>`;
+
+        const sum = monitoring.summary || {};
+        const html = `<!doctype html><html lang="id"><head><meta charset="utf-8" />
+<style>
+  @page { size: A4 landscape; margin: 12mm 10mm 15mm 10mm; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 9px; color: #111827; margin: 0; }
+  .kop-banner { border-bottom: 2px solid #1f2937; padding-bottom: 4px; margin-bottom: 6px; text-align: center; }
+  .kop-img { width: 100%; max-height: 90px; object-fit: contain; display: block; margin: 0 auto; }
+  .header { display:flex; align-items:center; gap:10px; border-bottom:2px solid #1f2937; padding-bottom:6px; margin-bottom:6px; }
+  .logo { width:42px; height:42px; object-fit:contain; }
+  .school-name { font-size:13px; font-weight:bold; margin:0; }
+  .school-addr { font-size:8px; color:#4b5563; margin:2px 0 0; }
+  .title { text-align:center; font-size:12.5px; font-weight:bold; margin:6px 0 4px; text-transform:uppercase; }
+  .meta { display:flex; justify-content:space-between; font-size:8.5px; color:#374151; margin-bottom:6px; }
+  .sum { display:flex; gap:8px; margin-bottom:8px; }
+  .sum div { border:0.6px solid #9ca3af; padding:4px 10px; min-width:115px; }
+  .sum b { font-size:11px; display:block; }
+  h3 { font-size:10px; margin:8px 0 4px; page-break-after:avoid; }
+  table.grid { width:100%; border-collapse:collapse; font-size:8px; }
+  table.grid th, table.grid td { border:0.6px solid #9ca3af; padding:3px 4px; vertical-align:middle; }
+  table.grid th { background:#e5e7eb; font-weight:bold; text-align:center; }
+  thead { display:table-header-group; } tr { page-break-inside:avoid; }
+  .c { text-align:center; } .name { text-align:left; }
+  .sub { font-size:7px; color:#6b7280; font-weight:normal; }
+  .legend { font-size:7.5px; color:#374151; margin:4px 0 8px; }
+  .ok-box { background:#ecfdf5; border:0.6px solid #10b981; color:#065f46; padding:6px 8px; font-weight:bold; }
+  .note { margin-top:8px; font-size:8px; color:#4b5563; background:#f9fafb; border:0.6px solid #d1d5db; padding:4px 6px; }
+  .section-block { margin-top:10px; }
+</style></head><body>
+  ${kopHtml}
+  <div class="title">Laporan Monitoring Presensi Jam Pelajaran</div>
+  <div class="meta">
+    <div>
+      <strong>Tanggal:</strong> ${escapeHtml(formatDateId(monitoring.attendance_date))} |
+      <strong>Tahun Ajaran:</strong> ${escapeHtml(monitoring.academic_year?.name || '-')} |
+      <strong>Status:</strong> ${monitoring.is_today ? 'Hari Ini (Berjalan)' : 'Historis'}
+    </div>
+    <div style="text-align:right;"><strong>Dicetak:</strong> ${escapeHtml(printedAt)} WIB</div>
+  </div>
+  <div class="sum">
+    <div>Kelas Dipantau<b>${sum.total_classes ?? 0}</b></div>
+    <div>Jam Sudah Diabsen<b style="color:#166534;">${sum.submitted_count ?? 0}</b></div>
+    <div>Jam Belum Diabsen<b style="color:#991b1b;">${sum.not_recorded_count ?? 0}</b></div>
+    <div>Jam Dibatalkan<b style="color:#92400e;">${sum.cancelled_count ?? 0}</b></div>
+  </div>
+  <h3>A. Matriks Status Pengisian Presensi Per Kelas</h3>
+  <table class="grid">
+    <thead>
+      <tr>
+        <th style="width:24px;">No</th>
+        <th style="width:140px;">Kelas</th>
+        ${periods.map((p) => `<th>J${p.period_number}<br/><span style="font-weight:normal;font-size:7px;">${escapeHtml(String(p.start_time || '').slice(0, 5))}</span></th>`).join('')}
+        <th style="width:95px;">Belum Diabsen</th>
+      </tr>
+    </thead>
+    <tbody>${matrixRowsHtml}</tbody>
+  </table>
+  <div class="legend"><strong>Legenda:</strong> ✓ = Sudah Diabsen | – = Belum Diabsen | ◷ = Belum Dimulai | ✕ = Dibatalkan | ? = Tidak Diketahui</div>
+
+  <div class="section-block">
+    <h3>B. Daftar Kelas yang Belum Diabsen</h3>
+    ${unrecordedTableHtml}
+  </div>
+  ${monitoring.note ? `<div class="note"><strong>Catatan:</strong> ${escapeHtml(monitoring.note)}</div>` : ''}
+</body></html>`;
+
+        const browser = await require('puppeteer').launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+        try {
+            const page = await browser.newPage();
+            await page.setContent(html, { waitUntil: 'networkidle0' });
+            const footerText = escapeHtml(docSetting?.pdf_footer_text || 'Edulite - Monitoring Presensi Jam Pelajaran');
+            const pdf = await page.pdf({
+                format: 'A4',
+                landscape: true,
+                printBackground: true,
+                displayHeaderFooter: true,
+                headerTemplate: '<span></span>',
+                footerTemplate: `<div style="width:100%;font-size:7.5px;color:#6b7280;padding:0 10mm;display:flex;justify-content:space-between;"><span>${footerText} | Dicetak: ${escapeHtml(printedAt)} WIB</span><span>Halaman <span class="pageNumber"></span> dari <span class="totalPages"></span></span></div>`,
+                margin: { top: '12mm', right: '10mm', bottom: '15mm', left: '10mm' }
+            });
+            const filename = `Monitoring-Presensi-Jam-Pelajaran-${monitoring.attendance_date}.pdf`;
+            return { buffer: Buffer.from(pdf), filename };
         } finally {
             await browser.close();
         }

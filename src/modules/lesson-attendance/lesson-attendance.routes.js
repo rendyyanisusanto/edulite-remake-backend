@@ -126,6 +126,12 @@ router.get(
     permissionMiddleware('lesson_attendance.monitoring.view'),
     controller.getMonitoring
 );
+router.get(
+    '/lesson-attendance/monitoring/export/pdf',
+    authMiddleware,
+    permissionMiddleware('lesson_attendance.monitoring.view'),
+    controller.exportMonitoringPdf
+);
 
 // Admin — Transaction Management (LA-04)
 router.get(
