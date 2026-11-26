@@ -245,4 +245,30 @@ router.get(
     controller.exportDailyStudentPdf
 );
 
+// Admin — Integrated Daily Report: gate + Tahfidz + lesson attendance (LA-06, read-only)
+router.get(
+    '/lesson-attendance/reports/integrated-daily',
+    authMiddleware,
+    permissionMiddleware('lesson_attendance.integrated_daily_report.view'),
+    controller.getIntegratedDailyReport
+);
+router.get(
+    '/lesson-attendance/reports/integrated-daily/scope',
+    authMiddleware,
+    permissionMiddleware('lesson_attendance.integrated_daily_report.view'),
+    controller.getIntegratedDailyScope
+);
+router.get(
+    '/lesson-attendance/reports/integrated-daily/export/excel',
+    authMiddleware,
+    permissionMiddleware('lesson_attendance.integrated_daily_report.export_excel'),
+    controller.exportIntegratedDailyExcel
+);
+router.get(
+    '/lesson-attendance/reports/integrated-daily/export/pdf',
+    authMiddleware,
+    permissionMiddleware('lesson_attendance.integrated_daily_report.export_pdf'),
+    controller.exportIntegratedDailyPdf
+);
+
 module.exports = router;

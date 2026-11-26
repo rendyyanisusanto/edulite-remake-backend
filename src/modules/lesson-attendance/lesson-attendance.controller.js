@@ -6,7 +6,14 @@ const reportService = require('./lesson-attendance-report.service');
 const exportService = require('./lesson-attendance-export.service');
 const dailyReportService = require('./lesson-attendance-daily-report.service');
 const dailyExportService = require('./lesson-attendance-daily-export.service');
+const integratedReportService = require('./lesson-attendance-integrated-report.service');
+const integratedExportService = require('./lesson-attendance-integrated-export.service');
+const crypto = require('crypto');
 const { getClientIp } = require('./lesson-attendance.auth');
+
+function getRequestId(req) {
+    return String(req.headers['x-request-id'] || req.id || crypto.randomUUID()).slice(0, 64);
+}
 const { AppError } = require('./lesson-attendance.constants');
 const logger = require('../../core/logger');
 
@@ -559,6 +566,60 @@ class LessonAttendanceController {
             res.end(buffer);
         } catch (error) {
             handleControllerError(res, next, error, { operation: 'exportDailyStudentPdf', actorId: req.user?.id });
+        }
+    }
+
+    // ==================== LA-06 Integrated Daily Report ====================
+
+    async getIntegratedDailyReport(req, res, next) {
+        try {
+            res.set('Cache-Control', 'no-store');
+            const data = await integratedReportService.buildReport(req.query, {
+                userId: req.user?.id, requestId: getRequestId(req)
+            });
+            res.json({ success: true, data });
+        } catch (error) {
+            handleControllerError(res, next, error, { operation: 'getIntegratedDailyReport', actorId: req.user?.id });
+        }
+    }
+
+    async getIntegratedDailyScope(req, res, next) {
+        try {
+            res.set('Cache-Control', 'no-store');
+            const scope = await integratedReportService.resolveClassScope(req.user?.id);
+            res.json({ success: true, data: { all_classes: scope.all_classes, class_ids: scope.class_ids } });
+        } catch (error) {
+            handleControllerError(res, next, error, { operation: 'getIntegratedDailyScope', actorId: req.user?.id });
+        }
+    }
+
+    async exportIntegratedDailyExcel(req, res, next) {
+        try {
+            const { buffer, filename } = await integratedExportService.generateExcel(
+                req.query, { userId: req.user?.id, requestId: getRequestId(req) }
+            );
+            res.setHeader('Cache-Control', 'no-store');
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            res.setHeader('Content-Length', buffer.length);
+            res.end(buffer);
+        } catch (error) {
+            handleControllerError(res, next, error, { operation: 'exportIntegratedDailyExcel', actorId: req.user?.id });
+        }
+    }
+
+    async exportIntegratedDailyPdf(req, res, next) {
+        try {
+            const { buffer, filename } = await integratedExportService.generatePdf(
+                req.query, { userId: req.user?.id, requestId: getRequestId(req) }
+            );
+            res.setHeader('Cache-Control', 'no-store');
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            res.setHeader('Content-Length', buffer.length);
+            res.end(buffer);
+        } catch (error) {
+            handleControllerError(res, next, error, { operation: 'exportIntegratedDailyPdf', actorId: req.user?.id });
         }
     }
 }
