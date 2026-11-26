@@ -107,19 +107,58 @@ function parseBoolFlag(val, defaultVal = true) {
     return !['false', '0', 'no', 'off'].includes(s);
 }
 
+function parseClassIds(query = {}) {
+    const raw = query.class_ids !== undefined && query.class_ids !== '' ? query.class_ids : query.class_id;
+    const arr = Array.isArray(raw) ? raw : String(raw || '').split(',');
+    const ids = [...new Set(arr.map((v) => Number(String(v).trim())).filter((n) => Number.isInteger(n) && n > 0))];
+    if (ids.length === 0) {
+        throw new AppError('Pilih minimal satu kelas untuk dicetak.', 422, ERROR_CODES.INVALID_CLASS);
+    }
+    if (ids.length > 50) {
+        throw new AppError('Maksimal 50 kelas dalam satu kali cetak PDF.', 422, ERROR_CODES.VALIDATION_ERROR);
+    }
+    return ids;
+}
+
 class IntegratedDailyReportExportService {
     async _load(query, actor) {
         // Exports always cover the entire class: view-only filters are ignored.
         const {
-            search, finding_category, finding_code,
+            search, finding_category, finding_code, class_ids,
             include_kop, include_matrix, include_summary, include_findings, include_notes,
             ...base
         } = query || {};
-        void search; void finding_category; void finding_code;
+        void search; void finding_category; void finding_code; void class_ids;
         void include_kop; void include_matrix; void include_summary; void include_findings; void include_notes;
         return reportService.buildReport(base, {
             userId: actor.userId, requestId: actor.requestId, applyViewFilters: false
         });
+    }
+
+    async _loadMany(query, actor) {
+        const classIds = parseClassIds(query);
+        const {
+            search, finding_category, finding_code, class_ids,
+            include_kop, include_matrix, include_summary, include_findings, include_notes,
+            ...base
+        } = query || {};
+        void search; void finding_category; void finding_code; void class_ids;
+        void include_kop; void include_matrix; void include_summary; void include_findings; void include_notes;
+
+        const reports = [];
+        for (const cid of classIds) {
+            reports.push(await reportService.buildReport(
+                { ...base, class_id: cid },
+                { userId: actor.userId, requestId: actor.requestId, applyViewFilters: false }
+            ));
+        }
+        // Deterministic grouping order: grade level -> class name -> class id (never random)
+        reports.sort((a, b) =>
+            (Number(a.class.grade_level ?? 999) - Number(b.class.grade_level ?? 999)) ||
+            String(a.class.name || '').localeCompare(String(b.class.name || ''), 'id') ||
+            (Number(a.class.id) - Number(b.class.id))
+        );
+        return reports;
     }
 
     _logExport(report, format, actor) {
@@ -352,14 +391,7 @@ class IntegratedDailyReportExportService {
     }
 
     // ------------------------------------------------------------------------------ PDF
-    buildPdfHtml(report, { schoolProfile, logoDataUri, headerImageUri, sections = {} }) {
-        const opts = {
-            kop: sections.kop !== false,
-            matrix: sections.matrix !== false,
-            summary: sections.summary !== false,
-            findings: sections.findings !== false,
-            notes: sections.notes !== false
-        };
+    _renderClassSectionHtml(report, { schoolProfile, logoDataUri, headerImageUri, opts }) {
         const periods = report.periods;
         const dense = periods.length > 14;
         const tdFont = dense ? 6.5 : 7.5;
@@ -427,7 +459,7 @@ class IntegratedDailyReportExportService {
 
         const matrixHtml = !opts.matrix ? '' : `
 <h3>A. REKAPITULASI PRESENSI HARIAN</h3>
-<table class="grid"><thead>
+<table class="grid ${dense ? 'dense' : ''}"><thead>
   <tr><th rowspan="2">No</th><th rowspan="2">NIS</th><th rowspan="2">Nama Siswa</th><th colspan="2">Gerbang</th><th rowspan="2">Tahfidz</th>
       ${periods.length ? `<th colspan="${periods.length}">Jam Pelajaran</th>` : ''}<th colspan="5">Rekap Mapel</th></tr>
   <tr><th>Masuk</th><th>Pulang</th>${periods.map((p) => `<th>${escapeHtml(p.label)}</th>`).join('')}<th>H</th><th>T</th><th>I</th><th>S</th><th>A</th></tr>
@@ -452,10 +484,42 @@ ${warningHtml}</section>
 <div class="disc">${escapeHtml(DISCLAIMER)}</div>
 <div class="sign">Mengetahui,<br/>Wali Kelas<br/><br/><br/><br/>(${escapeHtml(homeroom)})${report.is_historical_mode ? '<br/><span style="font-size:7px">Nama wali kelas saat ini</span>' : ''}</div>`;
 
+        void tdFont;
+        return `<div class="class-section">
+${kopHtml}
+<div class="title">LAPORAN HARIAN TERPADU SISWA — ${escapeHtml(report.class.name)}</div>
+${report.is_provisional ? '<div class="prov">Laporan sementara — kegiatan sekolah masih berlangsung.</div>' : ''}
+<table class="meta"><tr>
+  <td><b>Tanggal</b>: ${escapeHtml(formatDateId(report.report_date))}</td>
+  <td><b>Tahun Ajaran</b>: ${escapeHtml(report.academic_year.name)}</td>
+  <td><b>Kelas</b>: ${escapeHtml(report.class.name)}</td>
+  <td><b>Wali Kelas</b>: ${escapeHtml(homeroom)}${report.is_historical_mode ? ' (saat ini)' : ''}</td>
+  <td><b>Jumlah Siswa</b>: ${report.class.student_count}</td>
+  <td><b>Waktu Cetak</b>: ${escapeHtml(generated)}</td></tr></table>
+${matrixHtml}
+${summaryHtml}
+${findingsHtml}
+${notesHtml}
+</div>`;
+    }
+
+    buildMultiPdfHtml(reports, { schoolProfile, logoDataUri, headerImageUri, sections = {} }) {
+        const opts = {
+            kop: sections.kop !== false,
+            matrix: sections.matrix !== false,
+            summary: sections.summary !== false,
+            findings: sections.findings !== false,
+            notes: sections.notes !== false
+        };
+        const bodyHtml = reports
+            .map((r) => this._renderClassSectionHtml(r, { schoolProfile, logoDataUri, headerImageUri, opts }))
+            .join('\n');
+
         return `<!doctype html><html lang="id"><head><meta charset="utf-8" />
 <style>
   @page { size: A4 landscape; margin: 12mm 10mm 16mm 10mm; }
   body { font-family: Arial, Helvetica, sans-serif; font-size: 9px; color: #111827; margin: 0; }
+  .class-section + .class-section { page-break-before: always; }
   .kop-banner { border-bottom: 2px solid #1f2937; padding-bottom: 4px; margin-bottom: 6px; text-align: center; }
   .kop-img { width: 100%; max-height: 90px; object-fit: contain; display: block; margin: 0 auto; }
   .header { display:flex; align-items:center; gap:10px; border-bottom:2px solid #1f2937; padding-bottom:6px; margin-bottom:6px; }
@@ -466,7 +530,8 @@ ${warningHtml}</section>
   .meta { width:100%; font-size:8.5px; margin-bottom:5px; border-collapse:collapse; } .meta td { padding:1px 4px; border:none; text-align:left; }
   h3 { font-size:10px; margin:8px 0 3px; page-break-after:avoid; }
   table.grid { width:100%; border-collapse:collapse; table-layout:auto; }
-  table.grid th, table.grid td { border:0.6px solid #9ca3af; padding:2px 3px; font-size:${tdFont}px; vertical-align:middle; }
+  table.grid th, table.grid td { border:0.6px solid #9ca3af; padding:2px 3px; font-size:7.5px; vertical-align:middle; }
+  table.grid.dense th, table.grid.dense td { font-size:6.5px; }
   table.grid th { background:#e5e7eb; text-align:center; font-weight:bold; }
   thead { display:table-header-group; } tr { page-break-inside:avoid; }
   .c { text-align:center; } .r { text-align:right; } .name { text-align:left; white-space:nowrap; }
@@ -481,21 +546,12 @@ ${warningHtml}</section>
   .disc { margin-top:8px; font-size:8px; font-style:italic; border:0.6px solid #9ca3af; padding:4px; page-break-inside:avoid; }
   section.keep { page-break-inside:avoid; }
 </style></head><body>
-${kopHtml}
-<div class="title">LAPORAN HARIAN TERPADU SISWA</div>
-${report.is_provisional ? '<div class="prov">Laporan sementara — kegiatan sekolah masih berlangsung.</div>' : ''}
-<table class="meta"><tr>
-  <td><b>Tanggal</b>: ${escapeHtml(formatDateId(report.report_date))}</td>
-  <td><b>Tahun Ajaran</b>: ${escapeHtml(report.academic_year.name)}</td>
-  <td><b>Kelas</b>: ${escapeHtml(report.class.name)}</td>
-  <td><b>Wali Kelas</b>: ${escapeHtml(homeroom)}${report.is_historical_mode ? ' (saat ini)' : ''}</td>
-  <td><b>Jumlah Siswa</b>: ${report.class.student_count}</td>
-  <td><b>Waktu Cetak</b>: ${escapeHtml(generated)}</td></tr></table>
-${matrixHtml}
-${summaryHtml}
-${findingsHtml}
-${notesHtml}
+${bodyHtml}
 </body></html>`;
+    }
+
+    buildPdfHtml(report, ctx) {
+        return this.buildMultiPdfHtml([report], ctx);
     }
 
     async generatePdf(query = {}, actor = {}) {
@@ -509,7 +565,8 @@ ${notesHtml}
         if (!sections.matrix && !sections.summary && !sections.findings && !sections.notes) {
             throw new AppError('Pilih minimal satu bagian laporan untuk dicetak.', 422, ERROR_CODES.VALIDATION_ERROR);
         }
-        const report = await this._load(query, actor);
+        const reports = await this._loadMany(query, actor);
+        const primary = reports[0];
         try {
             const [schoolProfile, docSetting] = await Promise.all([
                 SchoolProfile.findOne({ attributes: ['name', 'address', 'city', 'logo', 'logo_light'] }),
@@ -517,8 +574,8 @@ ${notesHtml}
             ]);
             const logoDataUri = loadLocalLogoDataUri(schoolProfile?.logo || schoolProfile?.logo_light);
             const headerImageUri = loadLocalLogoDataUri(docSetting?.header_image) || loadLocalLogoDataUri('header.png');
-            const html = this.buildPdfHtml(report, { schoolProfile, logoDataUri, headerImageUri, sections });
-            const generated = formatGenerated(report.generated_at, report.timezone);
+            const html = this.buildMultiPdfHtml(reports, { schoolProfile, logoDataUri, headerImageUri, sections });
+            const generated = formatGenerated(primary.generated_at, primary.timezone);
             const footerNote = escapeHtml(docSetting?.pdf_footer_text || 'Hasil pemeriksaan silang presensi — memerlukan verifikasi petugas.');
 
             const browser = await require('puppeteer').launch({
@@ -537,13 +594,16 @@ ${notesHtml}
                     footerTemplate: `<div style="width:100%;font-size:7px;color:#6b7280;padding:0 10mm;display:flex;justify-content:space-between;"><span>${footerNote} | Dicetak: ${escapeHtml(generated)}</span><span>Halaman <span class="pageNumber"></span> dari <span class="totalPages"></span></span></div>`,
                     margin: { top: '12mm', right: '10mm', bottom: '16mm', left: '10mm' }
                 });
-                this._logExport(report, 'pdf', actor);
-                return { buffer: Buffer.from(pdf), filename: buildFilename(report, 'pdf') };
+                reports.forEach((r) => this._logExport(r, 'pdf', actor));
+                const filename = reports.length === 1
+                    ? buildFilename(primary, 'pdf')
+                    : `Laporan-Harian-Terpadu-${reports.length}-Kelas-${primary.report_date}.pdf`;
+                return { buffer: Buffer.from(pdf), filename };
             } finally {
                 await browser.close();
             }
         } catch (error) {
-            return this._fail(error, 'exportPdf', report, actor);
+            return this._fail(error, 'exportPdf', primary, actor);
         }
     }
 
