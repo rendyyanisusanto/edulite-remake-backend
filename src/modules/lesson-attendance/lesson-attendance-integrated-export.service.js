@@ -101,11 +101,22 @@ function periodsText(f) {
     return f.affected_periods && f.affected_periods.length ? f.affected_periods.map((p) => `J${p}`).join(', ') : '-';
 }
 
+function parseBoolFlag(val, defaultVal = true) {
+    if (val === undefined || val === null || val === '') return defaultVal;
+    const s = String(val).trim().toLowerCase();
+    return !['false', '0', 'no', 'off'].includes(s);
+}
+
 class IntegratedDailyReportExportService {
     async _load(query, actor) {
         // Exports always cover the entire class: view-only filters are ignored.
-        const { search, finding_category, finding_code, ...base } = query || {};
+        const {
+            search, finding_category, finding_code,
+            include_kop, include_matrix, include_summary, include_findings, include_notes,
+            ...base
+        } = query || {};
         void search; void finding_category; void finding_code;
+        void include_kop; void include_matrix; void include_summary; void include_findings; void include_notes;
         return reportService.buildReport(base, {
             userId: actor.userId, requestId: actor.requestId, applyViewFilters: false
         });
@@ -341,7 +352,14 @@ class IntegratedDailyReportExportService {
     }
 
     // ------------------------------------------------------------------------------ PDF
-    buildPdfHtml(report, { schoolProfile, logoDataUri }) {
+    buildPdfHtml(report, { schoolProfile, logoDataUri, headerImageUri, sections = {} }) {
+        const opts = {
+            kop: sections.kop !== false,
+            matrix: sections.matrix !== false,
+            summary: sections.summary !== false,
+            findings: sections.findings !== false,
+            notes: sections.notes !== false
+        };
         const periods = report.periods;
         const dense = periods.length > 14;
         const tdFont = dense ? 6.5 : 7.5;
@@ -399,10 +417,47 @@ class IntegratedDailyReportExportService {
         const generated = formatGenerated(report.generated_at, report.timezone);
         const homeroom = report.class.homeroom_teacher_name || '-';
 
+        const kopHtml = !opts.kop ? '' : (headerImageUri
+            ? `<div class="kop-banner"><img class="kop-img" src="${headerImageUri}" alt="Kop Sekolah" /></div>`
+            : `<div class="header">
+  ${logoDataUri ? `<img class="logo" src="${logoDataUri}" alt="Logo" />` : ''}
+  <div><p class="school">${escapeHtml(schoolProfile?.name || 'SEKOLAH')}</p>
+  <p class="addr">${escapeHtml(schoolProfile?.address || '')}${schoolProfile?.city ? ` - ${escapeHtml(schoolProfile.city)}` : ''}</p></div>
+</div>`);
+
+        const matrixHtml = !opts.matrix ? '' : `
+<h3>A. REKAPITULASI PRESENSI HARIAN</h3>
+<table class="grid"><thead>
+  <tr><th rowspan="2">No</th><th rowspan="2">NIS</th><th rowspan="2">Nama Siswa</th><th colspan="2">Gerbang</th><th rowspan="2">Tahfidz</th>
+      ${periods.length ? `<th colspan="${periods.length}">Jam Pelajaran</th>` : ''}<th colspan="5">Rekap Mapel</th></tr>
+  <tr><th>Masuk</th><th>Pulang</th>${periods.map((p) => `<th>${escapeHtml(p.label)}</th>`).join('')}<th>H</th><th>T</th><th>I</th><th>S</th><th>A</th></tr>
+</thead><tbody>${rows}</tbody></table>
+<div class="legend"><b>Legenda:</b> ${escapeHtml(LEGEND)}. (T) pada jam masuk = terlambat.</div>`;
+
+        const summaryHtml = !opts.summary ? '' : `
+<section class="keep"><h3>B. RINGKASAN PRESENSI</h3>
+<div class="sum">${summaryItems.map(([k, v]) => `<div>${escapeHtml(k)}<br/><b>${v}</b></div>`).join('')}</div></section>`;
+
+        const needBreakBeforeFindings = opts.matrix || opts.summary;
+        const findingsHtml = !opts.findings ? '' : `
+<div class="${needBreakBeforeFindings ? 'findings' : ''}"><h3>C. DAFTAR POTENSI PELANGGARAN DAN KETIDAKSESUAIAN PRESENSI</h3>
+${report.findings_table.length ? `<table class="grid"><thead><tr><th style="width:24px">No</th><th style="width:60px">NIS</th><th style="width:130px">Nama Siswa</th><th>Potensi Pelanggaran / Temuan</th><th>Bukti dan Keterangan</th></tr></thead><tbody>${findingRows}</tbody></table>`
+            : '<p>Tidak ditemukan potensi pelanggaran atau ketidaksesuaian berdasarkan data presensi yang tersedia.</p>'}
+</div>`;
+
+        const notesHtml = !opts.notes ? '' : `
+<section class="keep"><h3>D. CATATAN KELENGKAPAN DATA</h3>
+<p>Gerbang masuk: ${fmt(c.gate_entry_records, c.total_students)} siswa memiliki record. Gerbang pulang: ${fmt(c.gate_exit_records, c.total_students)}. Tahfidz: ${fmt(c.tahfidz_records, c.total_students)}. Jam pelajaran: ${fmt(c.lesson_periods_recorded, c.lesson_periods_total)} jam telah tercatat.</p>
+${warningHtml}</section>
+<div class="disc">${escapeHtml(DISCLAIMER)}</div>
+<div class="sign">Mengetahui,<br/>Wali Kelas<br/><br/><br/><br/>(${escapeHtml(homeroom)})${report.is_historical_mode ? '<br/><span style="font-size:7px">Nama wali kelas saat ini</span>' : ''}</div>`;
+
         return `<!doctype html><html lang="id"><head><meta charset="utf-8" />
 <style>
   @page { size: A4 landscape; margin: 12mm 10mm 16mm 10mm; }
   body { font-family: Arial, Helvetica, sans-serif; font-size: 9px; color: #111827; margin: 0; }
+  .kop-banner { border-bottom: 2px solid #1f2937; padding-bottom: 4px; margin-bottom: 6px; text-align: center; }
+  .kop-img { width: 100%; max-height: 90px; object-fit: contain; display: block; margin: 0 auto; }
   .header { display:flex; align-items:center; gap:10px; border-bottom:2px solid #1f2937; padding-bottom:6px; margin-bottom:6px; }
   .logo { width:44px; height:44px; object-fit:contain; }
   .school { font-size:13px; font-weight:bold; margin:0; } .addr { font-size:8px; color:#4b5563; margin:2px 0 0; }
@@ -426,11 +481,7 @@ class IntegratedDailyReportExportService {
   .disc { margin-top:8px; font-size:8px; font-style:italic; border:0.6px solid #9ca3af; padding:4px; page-break-inside:avoid; }
   section.keep { page-break-inside:avoid; }
 </style></head><body>
-<div class="header">
-  ${logoDataUri ? `<img class="logo" src="${logoDataUri}" alt="Logo" />` : ''}
-  <div><p class="school">${escapeHtml(schoolProfile?.name || 'SEKOLAH')}</p>
-  <p class="addr">${escapeHtml(schoolProfile?.address || '')}${schoolProfile?.city ? ` - ${escapeHtml(schoolProfile.city)}` : ''}</p></div>
-</div>
+${kopHtml}
 <div class="title">LAPORAN HARIAN TERPADU SISWA</div>
 ${report.is_provisional ? '<div class="prov">Laporan sementara — kegiatan sekolah masih berlangsung.</div>' : ''}
 <table class="meta"><tr>
@@ -440,38 +491,33 @@ ${report.is_provisional ? '<div class="prov">Laporan sementara — kegiatan seko
   <td><b>Wali Kelas</b>: ${escapeHtml(homeroom)}${report.is_historical_mode ? ' (saat ini)' : ''}</td>
   <td><b>Jumlah Siswa</b>: ${report.class.student_count}</td>
   <td><b>Waktu Cetak</b>: ${escapeHtml(generated)}</td></tr></table>
-
-<h3>A. REKAPITULASI PRESENSI HARIAN</h3>
-<table class="grid"><thead>
-  <tr><th rowspan="2">No</th><th rowspan="2">NIS</th><th rowspan="2">Nama Siswa</th><th colspan="2">Gerbang</th><th rowspan="2">Tahfidz</th>
-      ${periods.length ? `<th colspan="${periods.length}">Jam Pelajaran</th>` : ''}<th colspan="5">Rekap Mapel</th></tr>
-  <tr><th>Masuk</th><th>Pulang</th>${periods.map((p) => `<th>${escapeHtml(p.label)}</th>`).join('')}<th>H</th><th>T</th><th>I</th><th>S</th><th>A</th></tr>
-</thead><tbody>${rows}</tbody></table>
-<div class="legend"><b>Legenda:</b> ${escapeHtml(LEGEND)}. (T) pada jam masuk = terlambat.</div>
-
-<section class="keep"><h3>B. RINGKASAN PRESENSI</h3>
-<div class="sum">${summaryItems.map(([k, v]) => `<div>${escapeHtml(k)}<br/><b>${v}</b></div>`).join('')}</div></section>
-
-<div class="findings"><h3>C. DAFTAR POTENSI PELANGGARAN DAN KETIDAKSESUAIAN PRESENSI</h3>
-${report.findings_table.length ? `<table class="grid"><thead><tr><th style="width:24px">No</th><th style="width:60px">NIS</th><th style="width:130px">Nama Siswa</th><th>Potensi Pelanggaran / Temuan</th><th>Bukti dan Keterangan</th></tr></thead><tbody>${findingRows}</tbody></table>`
-            : '<p>Tidak ditemukan potensi pelanggaran atau ketidaksesuaian berdasarkan data presensi yang tersedia.</p>'}
-<section class="keep"><h3>D. CATATAN KELENGKAPAN DATA</h3>
-<p>Gerbang masuk: ${fmt(c.gate_entry_records, c.total_students)} siswa memiliki record. Gerbang pulang: ${fmt(c.gate_exit_records, c.total_students)}. Tahfidz: ${fmt(c.tahfidz_records, c.total_students)}. Jam pelajaran: ${fmt(c.lesson_periods_recorded, c.lesson_periods_total)} jam telah tercatat.</p>
-${warningHtml}</section>
-<div class="disc">${escapeHtml(DISCLAIMER)}</div>
-<div class="sign">Mengetahui,<br/>Wali Kelas<br/><br/><br/><br/>(${escapeHtml(homeroom)})${report.is_historical_mode ? '<br/><span style="font-size:7px">Nama wali kelas saat ini</span>' : ''}</div>
-</div></body></html>`;
+${matrixHtml}
+${summaryHtml}
+${findingsHtml}
+${notesHtml}
+</body></html>`;
     }
 
     async generatePdf(query = {}, actor = {}) {
+        const sections = {
+            kop: parseBoolFlag(query.include_kop, true),
+            matrix: parseBoolFlag(query.include_matrix, true),
+            summary: parseBoolFlag(query.include_summary, true),
+            findings: parseBoolFlag(query.include_findings, true),
+            notes: parseBoolFlag(query.include_notes, true)
+        };
+        if (!sections.matrix && !sections.summary && !sections.findings && !sections.notes) {
+            throw new AppError('Pilih minimal satu bagian laporan untuk dicetak.', 422, ERROR_CODES.VALIDATION_ERROR);
+        }
         const report = await this._load(query, actor);
         try {
             const [schoolProfile, docSetting] = await Promise.all([
                 SchoolProfile.findOne({ attributes: ['name', 'address', 'city', 'logo', 'logo_light'] }),
-                DocumentSetting.findOne({ where: { is_active: true }, order: [['id', 'ASC']], attributes: ['pdf_footer_text'] })
+                DocumentSetting.findOne({ where: { is_active: true }, order: [['id', 'ASC']], attributes: ['header_image', 'pdf_footer_text'] })
             ]);
             const logoDataUri = loadLocalLogoDataUri(schoolProfile?.logo || schoolProfile?.logo_light);
-            const html = this.buildPdfHtml(report, { schoolProfile, logoDataUri });
+            const headerImageUri = loadLocalLogoDataUri(docSetting?.header_image) || loadLocalLogoDataUri('header.png');
+            const html = this.buildPdfHtml(report, { schoolProfile, logoDataUri, headerImageUri, sections });
             const generated = formatGenerated(report.generated_at, report.timezone);
             const footerNote = escapeHtml(docSetting?.pdf_footer_text || 'Hasil pemeriksaan silang presensi — memerlukan verifikasi petugas.');
 
